@@ -33,25 +33,28 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
     _startIdx = math.max(0, _endIdx - _defaultVisible);
   }
 
+  @override
+  void didUpdateWidget(CandleChartWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.quotes.length != widget.quotes.length) {
+      _endIdx = widget.quotes.length;
+      _startIdx = math.max(0, _endIdx - _defaultVisible);
+    }
+  }
+
   int get _displayCount => (_endIdx - _startIdx).clamp(1, widget.quotes.length);
 
   /// Returns MA arrays aligned with displayQuotes.
-  /// maData[i] corresponds to quotes[i + MA_DATA_START_OFFSET] in the full quotes list.
-  /// Since displayQuotes is a sublist of the last N quotes, we need to map display indices
-  /// to maData indices correctly.
   ({List<double?> ma5, List<double?> ma10, List<double?> ma20}) _getAlignedMa() {
     final ma5 = <double?>[];
     final ma10 = <double?>[];
     final ma20 = <double?>[];
-    // maData starts from index 59 in the full quotes list (first point where MA60 is valid)
     const maDataStartOffset = 59;
 
-    // Calculate the index in the full quotes list where displayQuotes starts
     final isTruncated = widget.quotes.length > _defaultVisible;
     final fullQuotesStartIdx = isTruncated ? widget.quotes.length - _defaultVisible : 0;
 
     for (var i = 0; i < _displayCount; i++) {
-      // The actual index in the full quotes list for this display element
       final actualQuoteIdx = fullQuotesStartIdx + i;
       final maIdx = actualQuoteIdx - maDataStartOffset;
       if (maIdx < 0 || maIdx >= widget.maData.length) {
@@ -92,7 +95,7 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
           },
           onTapUp: (details) {
             final cw = w / _displayCount;
-            final idx = ((details.localPosition.dx / cw) - 0.5).floor();
+            final idx = ((details.localPosition.dx - 40) / cw).floor();
             setState(() {
               if (idx >= 0 && idx < _displayCount) {
                 _touchedIdx = idx;
@@ -107,19 +110,22 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
             if (_touchedIdx != null) setState(() => _touchPos = d.localPosition);
           },
           onPanEnd: (_) => setState(() { _touchedIdx = null; _touchPos = null; }),
-          child: CustomPaint(
-            size: Size(w, h),
-            painter: _CandlePainter(
-              quotes: widget.quotes,
-              ma5: alignedMa.ma5,
-              ma10: alignedMa.ma10,
-              ma20: alignedMa.ma20,
-              startIdx: _startIdx,
-              endIdx: _endIdx,
-              scale: _scale,
-              touchedIdx: _touchedIdx,
-              touchPos: _touchPos,
-              defaultVisible: _defaultVisible,
+          child: Container(
+            color: AppColors.chartBackground,
+            child: CustomPaint(
+              size: Size(w, h),
+              painter: _CandlePainter(
+                quotes: widget.quotes,
+                ma5: alignedMa.ma5,
+                ma10: alignedMa.ma10,
+                ma20: alignedMa.ma20,
+                startIdx: _startIdx,
+                endIdx: _endIdx,
+                scale: _scale,
+                touchedIdx: _touchedIdx,
+                touchPos: _touchPos,
+                defaultVisible: _defaultVisible,
+              ),
             ),
           ),
         );
@@ -140,10 +146,11 @@ class _CandlePainter extends CustomPainter {
   final Offset? touchPos;
   final int defaultVisible;
 
-  static const double _lp = 8.0;
-  static const double _rp = 55.0;
-  static const double _tp = 8.0;
-  static const double _bp = 24.0;
+  // Responsive padding
+  double get _lp => 50.0;
+  double get _rp => 8.0;
+  double get _tp => 12.0;
+  double get _bp => 24.0;
 
   _CandlePainter({
     required this.quotes,

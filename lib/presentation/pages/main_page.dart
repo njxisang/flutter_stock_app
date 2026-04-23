@@ -7,7 +7,7 @@ import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/stock/stock_bloc.dart';
 import '../blocs/chart/chart_state.dart';
-import '../../data/datasources/stock_local_storage.dart';
+import '../blocs/watchlist/watchlist_cubit.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -313,6 +313,20 @@ class _MainPageState extends State<MainPage> {
             ],
           ),
           IconButton(
+            icon: const Icon(Icons.star_border),
+            tooltip: '添加自选',
+            onPressed: () {
+              context.read<WatchlistCubit>().addToWatchlist(data.symbol, data.name);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${data.name} 已添加到自选'),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.analytics_outlined),
             tooltip: '多因子分析',
             onPressed: () => context.go('/analysis'),
@@ -387,11 +401,13 @@ class _MainPageState extends State<MainPage> {
     final displayQuotes = quotes.length > 100 ? quotes.sublist(quotes.length - 100) : quotes;
     if (displayQuotes.isEmpty) return const Center(child: Text('数据不足'));
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: CandleChartWidget(
-        quotes: displayQuotes,
-        maData: maData,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
+        child: CandleChartWidget(
+          quotes: displayQuotes,
+          maData: maData,
+        ),
       ),
     );
   }
