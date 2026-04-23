@@ -419,20 +419,30 @@ class _MainPageState extends State<MainPage> {
 
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
-              color: AppColors.difColor,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
-              color: AppColors.deaColor,
-            ),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
+                color: AppColors.difColor,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
+                color: AppColors.deaColor,
+              ),
           ],
+          backgroundColor: AppColors.chartBackground,
+          gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
@@ -443,18 +453,29 @@ class _MainPageState extends State<MainPage> {
 
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
-              color: AppColors.primary,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
+                color: AppColors.primary,
+              ),
+            ],
+            minY: 0,
+            maxY: 100,
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-          ],
-          minY: 0,
-          maxY: 100,
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -465,24 +486,35 @@ class _MainPageState extends State<MainPage> {
 
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
-              color: AppColors.kColor,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
+                color: AppColors.kColor,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
+                color: AppColors.dColor,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
+                color: AppColors.jColor,
+              ),
+            ],
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
-              color: AppColors.dColor,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
-              color: AppColors.jColor,
-            ),
-          ],
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -494,28 +526,39 @@ class _MainPageState extends State<MainPage> {
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
     final displayQuotes = quotes.sublist(quotes.length - displayData.length);
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
-              color: AppColors.bollUpper,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
+                color: AppColors.bollUpper,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
+                color: AppColors.bollMiddle,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
+                color: AppColors.bollLower,
+              ),
+              LineChartBarData(
+                spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
+                color: AppColors.textPrimary,
+              ),
+            ],
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
-              color: AppColors.bollMiddle,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
-              color: AppColors.bollLower,
-            ),
-            LineChartBarData(
-              spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
-              color: AppColors.textPrimary,
-            ),
-          ],
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -526,28 +569,39 @@ class _MainPageState extends State<MainPage> {
 
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
-              color: AppColors.ma5Color,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
+                color: AppColors.ma5Color,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
+                color: AppColors.ma10Color,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
+                color: AppColors.ma20Color,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma60)).toList(),
+                color: AppColors.ma60Color,
+              ),
+            ],
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
-              color: AppColors.ma10Color,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
-              color: AppColors.ma20Color,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma60)).toList(),
-              color: AppColors.ma60Color,
-            ),
-          ],
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -558,22 +612,33 @@ class _MainPageState extends State<MainPage> {
 
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
-              color: AppColors.wr6Color,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
+                color: AppColors.wr6Color,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
+                color: AppColors.wr10Color,
+              ),
+            ],
+            minY: -100,
+            maxY: 0,
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
-              color: AppColors.wr10Color,
-            ),
-          ],
-          minY: -100,
-          maxY: 0,
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -584,24 +649,35 @@ class _MainPageState extends State<MainPage> {
 
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.pdi)).toList(),
-              color: AppColors.pdiColor,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.pdi)).toList(),
+                color: AppColors.pdiColor,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.mdi)).toList(),
+                color: AppColors.mdiColor,
+              ),
+              LineChartBarData(
+                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.adx)).toList(),
+                color: AppColors.adxColor,
+              ),
+            ],
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.mdi)).toList(),
-              color: AppColors.mdiColor,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.adx)).toList(),
-              color: AppColors.adxColor,
-            ),
-          ],
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -623,21 +699,34 @@ class _MainPageState extends State<MainPage> {
       bins[binIndex]++;
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: BarChart(
-        BarChartData(
-          barGroups: bins.asMap().entries.map((e) {
-            return BarChartGroupData(
-              x: e.key,
-              barRods: [
-                BarChartRodData(
-                  toY: e.value.toDouble(),
-                  color: AppColors.primary,
-                ),
-              ],
-            );
-          }).toList(),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: BarChart(
+          BarChartData(
+            barGroups: bins.asMap().entries.map((e) {
+              return BarChartGroupData(
+                x: e.key,
+                barRods: [
+                  BarChartRodData(
+                    toY: e.value.toDouble(),
+                    color: AppColors.primary,
+                    width: 16,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              );
+            }).toList(),
+            backgroundColor: AppColors.chartBackground,
+            gridData: FlGridData(show: true, drawVerticalLine: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );

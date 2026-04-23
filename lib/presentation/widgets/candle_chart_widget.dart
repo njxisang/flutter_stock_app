@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import '../../domain/entities/stock_quote.dart';
 import '../../core/constants/app_constants.dart';
 
-/// Real OHLC candlestick chart with MA overlays using CustomPainter.
+/// Professional OHLC candlestick chart with MA overlays and volume.
 class CandleChartWidget extends StatefulWidget {
   final List<StockQuote> quotes;
   final List<MaData> maData;
@@ -44,7 +44,6 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
 
   int get _displayCount => (_endIdx - _startIdx).clamp(1, widget.quotes.length);
 
-  /// Returns MA arrays aligned with displayQuotes.
   ({List<double?> ma5, List<double?> ma10, List<double?> ma20}) _getAlignedMa() {
     final ma5 = <double?>[];
     final ma10 = <double?>[];
@@ -77,6 +76,14 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
+
+        // Responsive padding based on screen width
+        final leftPadding = w > 400 ? 56.0 : (w > 300 ? 48.0 : 40.0);
+        final rightPadding = w > 400 ? 8.0 : 4.0;
+        final topPadding = 8.0;
+        final bottomPadding = h > 300 ? 40.0 : 30.0;
+        final volumeHeight = h > 300 ? 60.0 : 40.0;
+
         final alignedMa = _getAlignedMa();
 
         return GestureDetector(
@@ -86,16 +93,19 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
                 _scale = (_scale * details.scale).clamp(0.5, 4.0);
               } else {
                 final dx = details.focalPointDelta.dx;
-                final cw = w / _displayCount;
-                final idxDelta = (-dx / cw * _scale).round().clamp(-_displayCount, widget.quotes.length - _displayCount);
+                final chartWidth = w - leftPadding - rightPadding;
+                final cw = chartWidth / _displayCount;
+                final idxDelta = (-dx / cw * _scale).round()
+                    .clamp(-_displayCount, widget.quotes.length - _displayCount);
                 _startIdx = (_startIdx + idxDelta).clamp(0, widget.quotes.length - _displayCount);
                 _endIdx = _startIdx + _displayCount;
               }
             });
           },
           onTapUp: (details) {
-            final cw = w / _displayCount;
-            final idx = ((details.localPosition.dx - 40) / cw).floor();
+            final chartWidth = w - leftPadding - rightPadding;
+            final cw = chartWidth / _displayCount;
+            final idx = ((details.localPosition.dx - leftPadding) / cw).floor();
             setState(() {
               if (idx >= 0 && idx < _displayCount) {
                 _touchedIdx = idx;
@@ -111,7 +121,10 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
           },
           onPanEnd: (_) => setState(() { _touchedIdx = null; _touchPos = null; }),
           child: Container(
-            color: AppColors.chartBackground,
+            decoration: BoxDecoration(
+              color: AppColors.chartBackground,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: CustomPaint(
               size: Size(w, h),
               painter: _CandlePainter(
@@ -124,7 +137,13 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
                 scale: _scale,
                 touchedIdx: _touchedIdx,
                 touchPos: _touchPos,
-                defaultVisible: _defaultVisible,
+                leftPadding: leftPadding,
+                rightPadding: rightPadding,
+                topPadding: topPadding,
+                bottomPadding: bottomPadding,
+                volumeHeight: volumeHeight,
+                chartWidth: w,
+                chartHeight: h,
               ),
             ),
           ),
@@ -144,13 +163,13 @@ class _CandlePainter extends CustomPainter {
   final double scale;
   final int? touchedIdx;
   final Offset? touchPos;
-  final int defaultVisible;
-
-  // Responsive padding
-  double get _lp => 50.0;
-  double get _rp => 8.0;
-  double get _tp => 12.0;
-  double get _bp => 24.0;
+  final double leftPadding;
+  final double rightPadding;
+  final double topPadding;
+  final double bottomPadding;
+  final double volumeHeight;
+  final double chartWidth;
+  final double chartHeight;
 
   _CandlePainter({
     required this.quotes,
@@ -162,7 +181,13 @@ class _CandlePainter extends CustomPainter {
     required this.scale,
     this.touchedIdx,
     this.touchPos,
-    required this.defaultVisible,
+    required this.leftPadding,
+    required this.rightPadding,
+    required this.topPadding,
+    required this.bottomPadding,
+    required this.volumeHeight,
+    required this.chartWidth,
+    required this.chartHeight,
   });
 
   @override
@@ -170,8 +195,10 @@ class _CandlePainter extends CustomPainter {
     if (quotes.isEmpty || endIdx <= startIdx) return;
 
     final displayQuotes = quotes.sublist(startIdx, endIdx);
-    final cw = (size.width - _lp - _rp) / (displayQuotes.length > 0 ? displayQuotes.length : 1);
-    final bodyW = (cw * 0.70).clamp(3.0, 16.0);
+    final chartWidth = size.width - leftPadding - rightPadding;
+    final priceChartHeight = size.height - topPadding - bottomPadding - volumeHeight;
+    final cw = chartWidth / displayQuotes.length;
+    final bodyW = (cw * 0.65).clamp(2.0, 14.0);
 
     // Price range
     double minP = double.infinity, maxP = double.negativeInfinity;
@@ -179,170 +206,302 @@ class _CandlePainter extends CustomPainter {
       if (q.low < minP) minP = q.low;
       if (q.high > maxP) maxP = q.high;
     }
-    final pad = (maxP - minP) * 0.06;
+    final pad = (maxP - minP) * 0.08;
     minP -= pad;
     maxP += pad;
     final priceRange = maxP - minP;
-    final ch = size.height - _tp - _bp;
 
-    double p2y(double p) => _tp + ch * (1 - (p - minP) / priceRange);
+    double p2y(double p) => topPadding + priceChartHeight * (1 - (p - minP) / priceRange);
 
-    // Grid
-    _drawGrid(canvas, size, ch, minP, maxP);
-
-    // Price labels
-    _drawPriceLabels(canvas, size, ch, minP, maxP);
-
-    // Date labels
+    // Draw components
+    _drawGrid(canvas, size, priceChartHeight, minP, maxP);
+    _drawPriceLabels(canvas, size, priceChartHeight, minP, maxP);
     _drawDateLabels(canvas, size, displayQuotes, cw);
-
-    // Candlesticks
-    for (var i = 0; i < displayQuotes.length; i++) {
-      final q = displayQuotes[i];
-      final x = _lp + i * cw + cw / 2;
-      final isUp = q.close >= q.open;
-      final col = isUp ? AppColors.bullish : AppColors.bearish;
-
-      // Wick
-      canvas.drawLine(Offset(x, p2y(q.high)), Offset(x, p2y(q.low)),
-          Paint()..color = col..strokeWidth = 1.0);
-
-      // Body
-      final bodyTop = math.min(p2y(q.open), p2y(q.close));
-      final bodyBot = math.max(p2y(q.open), p2y(q.close));
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x - bodyW / 2, bodyTop, bodyW, math.max(1.0, bodyBot - bodyTop)),
-          const Radius.circular(1),
-        ),
-        Paint()..color = col,
-      );
-
-      // Touched highlight
-      if (touchedIdx == i) {
-        canvas.drawRect(Rect.fromLTWH(_lp, _tp, size.width - _lp - _rp, ch),
-            Paint()..color = Colors.amber.withAlpha(60));
-        // Touched line
-        canvas.drawLine(Offset(x, _tp), Offset(x, size.height - _bp),
-            Paint()..color = Colors.amber.withAlpha(100)..strokeWidth = 1.0);
-      }
-    }
-
-    // MA overlays
-    _drawMa(canvas, displayQuotes, cw, ma5, startIdx, ch, minP, priceRange, AppColors.ma5Color, 'MA5');
-    _drawMa(canvas, displayQuotes, cw, ma10, startIdx, ch, minP, priceRange, AppColors.ma10Color, 'MA10');
-    _drawMa(canvas, displayQuotes, cw, ma20, startIdx, ch, minP, priceRange, AppColors.ma20Color, 'MA20');
-
-    // Tooltip
-    if (touchedIdx != null && touchPos != null && touchedIdx! < displayQuotes.length) {
-      _drawTooltip(canvas, size, displayQuotes[touchedIdx!], touchPos!);
-    }
+    _drawCandlesticks(canvas, displayQuotes, cw, bodyW, p2y);
+    _drawVolume(canvas, displayQuotes, cw, bodyW);
+    _drawMaLines(canvas, displayQuotes, cw, priceChartHeight, minP, priceRange);
+    _drawCrosshair(canvas, size, displayQuotes, cw, p2y);
+    _drawTooltip(canvas, size, displayQuotes);
   }
 
-  void _drawGrid(Canvas canvas, Size size, double ch, double minP, double maxP) {
-    final paint = Paint()..color = Colors.grey.withAlpha(40)..strokeWidth = 0.5;
+  void _drawGrid(Canvas canvas, Size size, double priceChartHeight, double minP, double maxP) {
+    final paint = Paint()
+      ..color = Colors.white.withAlpha(13)
+      ..strokeWidth = 0.5;
+
     final step = _niceStep((maxP - minP) / 5);
     var p = (minP / step).ceil() * step;
     while (p < maxP) {
-      final y = _tp + ch * (1 - (p - minP) / (maxP - minP));
-      canvas.drawLine(Offset(_lp, y), Offset(size.width - _rp, y), paint);
+      final y = topPadding + priceChartHeight * (1 - (p - minP) / (maxP - minP));
+      canvas.drawLine(Offset(leftPadding, y), Offset(size.width - rightPadding, y), paint);
       p += step;
     }
+
+    // Volume grid lines (lighter)
+    final volPaint = Paint()
+      ..color = Colors.white.withAlpha(7)
+      ..strokeWidth = 0.5;
+    canvas.drawLine(
+      Offset(leftPadding, size.height - bottomPadding - volumeHeight),
+      Offset(size.width - rightPadding, size.height - bottomPadding - volumeHeight),
+      volPaint,
+    );
   }
 
-  void _drawPriceLabels(Canvas canvas, Size size, double ch, double minP, double maxP) {
-    final style = TextStyle(color: AppColors.textSecondary, fontSize: 9);
+  void _drawPriceLabels(Canvas canvas, Size size, double priceChartHeight, double minP, double maxP) {
+    final style = TextStyle(color: Colors.white.withAlpha(153), fontSize: 9);
     final step = _niceStep((maxP - minP) / 5);
     var p = (minP / step).ceil() * step;
     while (p < maxP) {
-      final y = _tp + ch * (1 - (p - minP) / (maxP - minP));
-      final tp = TextPainter(text: TextSpan(text: p.toStringAsFixed(2), style: style), textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, Offset(size.width - _rp + 4, y - tp.height / 2));
+      final y = topPadding + priceChartHeight * (1 - (p - minP) / (maxP - minP));
+      final tp = TextPainter(
+        text: TextSpan(text: p.toStringAsFixed(2), style: style),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(leftPadding - tp.width - 6, y - tp.height / 2));
       p += step;
     }
   }
 
   void _drawDateLabels(Canvas canvas, Size size, List<StockQuote> qs, double cw) {
     if (qs.isEmpty) return;
-    final step = (qs.length / 5).ceil().clamp(1, qs.length);
-    final style = TextStyle(color: AppColors.textSecondary, fontSize: 8);
+    final step = (qs.length / 6).ceil().clamp(1, qs.length);
+    final style = TextStyle(color: Colors.white.withAlpha(128), fontSize: 8);
     for (var i = 0; i < qs.length; i += step) {
       final parts = qs[i].date.split('-');
-      final label = parts.length >= 2 ? '${parts[1]}-${parts[2]}' : qs[i].date;
-      final x = _lp + i * cw;
+      final label = parts.length >= 2 ? '${parts[1]}/${parts[2]}' : qs[i].date;
+      final x = leftPadding + i * cw;
       final tp = TextPainter(text: TextSpan(text: label, style: style), textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, Offset(x, size.height - _bp + 4));
+      tp.paint(canvas, Offset(x, size.height - bottomPadding + 8));
     }
   }
 
-  void _drawMa(Canvas canvas, List<StockQuote> displayQuotes, double cw,
-      List<double?> ma, int start, double ch, double minP, double priceRange,
-      Color color, String label) {
+  void _drawCandlesticks(Canvas canvas, List<StockQuote> displayQuotes, double cw, double bodyW,
+      double Function(double) p2y) {
+    for (var i = 0; i < displayQuotes.length; i++) {
+      final q = displayQuotes[i];
+      final x = leftPadding + i * cw + cw / 2;
+      final isUp = q.close >= q.open;
+
+      final bullColor = Color(0xFF00C853);
+      final bearColor = Color(0xFFFF1744);
+      final col = isUp ? bullColor : bearColor;
+
+      // Wick
+      canvas.drawLine(
+        Offset(x, p2y(q.high)),
+        Offset(x, p2y(q.low)),
+        Paint()..color = col..strokeWidth = 1.0,
+      );
+
+      // Body
+      final bodyTop = math.min(p2y(q.open), p2y(q.close));
+      final bodyBot = math.max(p2y(q.open), p2y(q.close));
+      final bodyHeight = math.max(1.0, bodyBot - bodyTop);
+
+      if (isUp) {
+        // Hollow body for bullish
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x - bodyW / 2, bodyTop, bodyW, bodyHeight),
+            Radius.circular(1),
+          ),
+          Paint()..color = col,
+        );
+        // Inner white rect for hollow effect
+        if (bodyW > 4) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(x - bodyW / 2 + 1, bodyTop + 1, bodyW - 2, bodyHeight - 2),
+              Radius.circular(1),
+            ),
+            Paint()..color = Color(0xFF1A1A2E),
+          );
+        }
+      } else {
+        // Filled body for bearish
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x - bodyW / 2, bodyTop, bodyW, bodyHeight),
+            Radius.circular(1),
+          ),
+          Paint()..color = col,
+        );
+      }
+
+      // Touched highlight
+      if (touchedIdx == i) {
+        final highlightPaint = Paint()..color = Colors.white.withAlpha(25);
+        canvas.drawRect(
+          Rect.fromLTWH(leftPadding, topPadding, chartWidth - leftPadding - rightPadding, p2y(minP) - topPadding),
+          highlightPaint,
+        );
+      }
+    }
+  }
+
+  void _drawVolume(Canvas canvas, List<StockQuote> displayQuotes, double cw, double bodyW) {
+    final volTop = chartHeight - bottomPadding - volumeHeight;
+
+    // Find max volume for scaling
+    double maxVol = 0;
+    for (final q in displayQuotes) {
+      final vol = q.close - q.open;
+      if (vol > maxVol) maxVol = vol;
+    }
+    if (maxVol == 0) maxVol = 1;
+
+    for (var i = 0; i < displayQuotes.length; i++) {
+      final q = displayQuotes[i];
+      final x = leftPadding + i * cw + cw / 2;
+      final isUp = q.close >= q.open;
+      final col = isUp ? Color(0xFF00C853).withAlpha(100) : Color(0xFFFF1744).withAlpha(100);
+
+      final volHeight = (volumeHeight * 0.9 * (q.close.abs() / maxVol)).clamp(1.0, volumeHeight * 0.9);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x - bodyW / 2, volTop + volumeHeight - volHeight, bodyW, volHeight),
+          Radius.circular(1),
+        ),
+        Paint()..color = col,
+      );
+    }
+  }
+
+  void _drawMaLines(Canvas canvas, List<StockQuote> displayQuotes, double cw,
+      double priceChartHeight, double minP, double priceRange) {
+    final ma5Paint = Paint()..color = Color(0xFFFF6B6B)..strokeWidth = 1.5..style = PaintingStyle.stroke;
+    final ma10Paint = Paint()..color = Color(0xFF4ECDC4)..strokeWidth = 1.5..style = PaintingStyle.stroke;
+    final ma20Paint = Paint()..color = Color(0xFFFFE66D)..strokeWidth = 1.5..style = PaintingStyle.stroke;
+
+    _drawSingleMa(canvas, displayQuotes, cw, ma5, minP, priceRange, priceChartHeight, ma5Paint, 'MA5');
+    _drawSingleMa(canvas, displayQuotes, cw, ma10, minP, priceRange, priceChartHeight, ma10Paint, 'MA10');
+    _drawSingleMa(canvas, displayQuotes, cw, ma20, minP, priceRange, priceChartHeight, ma20Paint, 'MA20');
+  }
+
+  void _drawSingleMa(Canvas canvas, List<StockQuote> displayQuotes, double cw,
+      List<double?> ma, double minP, double priceRange, double priceChartHeight,
+      Paint paint, String label) {
     if (ma.isEmpty) return;
 
     final path = Path();
     var started = false;
     double lastX = 0, lastY = 0;
 
-    // ma is now pre-aligned to displayQuotes indices, so use i directly (not start + i)
     for (var i = 0; i < displayQuotes.length; i++) {
       final v = ma[i];
       if (v == null) continue;
-      final x = _lp + i * cw + cw / 2;
-      final y = _tp + ch * (1 - (v - minP) / priceRange);
+      final x = leftPadding + i * cw + cw / 2;
+      final y = topPadding + priceChartHeight * (1 - (v - minP) / priceRange);
       if (!started) { path.moveTo(x, y); started = true; }
       else path.lineTo(x, y);
       lastX = x;
       lastY = y;
     }
 
-    canvas.drawPath(path, Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke);
+    canvas.drawPath(path, paint);
 
     // Label at end
     if (started) {
       final lb = TextPainter(
-        text: TextSpan(text: label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold)),
+        text: TextSpan(text: label, style: TextStyle(color: paint.color, fontSize: 9, fontWeight: FontWeight.bold)),
         textDirection: TextDirection.ltr,
       )..layout();
-      lb.paint(canvas, Offset((lastX + 4).clamp(0, canvas.getLocalClipBounds().width - 30), lastY - lb.height - 1));
+      final labelX = (lastX + 4).clamp(0, chartWidth - 30);
+      final labelY = (lastY - lb.height - 2).clamp(topPadding, topPadding + priceChartHeight - lb.height);
+      lb.paint(canvas, Offset(labelX, labelY));
     }
   }
 
-  void _drawTooltip(Canvas canvas, Size size, StockQuote q, Offset pos) {
+  void _drawCrosshair(Canvas canvas, Size size, List<StockQuote> displayQuotes, double cw,
+      double Function(double) p2y) {
+    if (touchedIdx == null || touchPos == null) return;
+
+    final x = leftPadding + touchedIdx! * cw + cw / 2;
+
+    // Vertical line
+    canvas.drawLine(
+      Offset(x, topPadding),
+      Offset(x, size.height - bottomPadding),
+      Paint()..color = Colors.white.withAlpha(60)..strokeWidth = 0.5,
+    );
+
+    // Horizontal line
+    final q = displayQuotes[touchedIdx!];
+    final y = p2y(q.close);
+    canvas.drawLine(
+      Offset(leftPadding, y),
+      Offset(size.width - rightPadding, y),
+      Paint()..color = Colors.white.withAlpha(60)..strokeWidth = 0.5,
+    );
+
+    // Price tag on left
+    final priceTag = TextPainter(
+      text: TextSpan(text: q.close.toStringAsFixed(2), style: TextStyle(color: Colors.white, fontSize: 9)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(leftPadding - priceTag.width - 8, y - priceTag.height / 2, priceTag.width + 8, priceTag.height),
+        Radius.circular(3),
+      ),
+      Paint()..color = Color(0xFF00C853),
+    );
+    priceTag.paint(canvas, Offset(leftPadding - priceTag.width - 4, y - priceTag.height / 2));
+  }
+
+  void _drawTooltip(Canvas canvas, Size size, List<StockQuote> displayQuotes) {
+    if (touchedIdx == null || touchPos == null || touchedIdx! >= displayQuotes.length) return;
+
+    final q = displayQuotes[touchedIdx!];
     final isUp = q.close >= q.open;
-    final bg = (isUp ? AppColors.bullish : AppColors.bearish).withAlpha(235);
+    final col = isUp ? Color(0xFF00C853) : Color(0xFFFF1744);
+    final change = ((q.close - q.open) / q.open * 100);
+
     final lines = <String>[
-      '日期: ${q.date}',
-      '开: ${q.open.toStringAsFixed(2)}',
-      '高: ${q.high.toStringAsFixed(2)}',
-      '低: ${q.low.toStringAsFixed(2)}',
-      '收: ${q.close.toStringAsFixed(2)}',
-      '涨跌: ${((q.close - q.open) / q.open * 100).toStringAsFixed(2)}%',
+      q.date,
+      '开 ${q.open.toStringAsFixed(2)}',
+      '高 ${q.high.toStringAsFixed(2)}',
+      '低 ${q.low.toStringAsFixed(2)}',
+      '收 ${q.close.toStringAsFixed(2)}',
+      '${isUp ? '+' : ''}${change.toStringAsFixed(2)}%',
     ];
-    final sty = const TextStyle(color: Colors.white, fontSize: 10);
+
+    final sty = TextStyle(color: Colors.white, fontSize: 10);
     double mw = 0;
     for (final l in lines) {
       final tp = TextPainter(text: TextSpan(text: l, style: sty), textDirection: TextDirection.ltr)..layout();
       mw = math.max(mw, tp.width);
     }
+
     const pad = 8.0;
     final bw = mw + pad * 2;
-    final bh = lines.length * 13.0 + pad * 2;
-    var tx = pos.dx + 12;
-    var ty = pos.dy - bh / 2;
-    if (tx + bw > size.width - 4) tx = pos.dx - bw - 12;
-    ty = ty.clamp(4.0, size.height - bh - 4.0);
+    final bh = lines.length * 14.0 + pad * 2;
+    var tx = touchPos!.dx + 12;
+    var ty = touchPos!.dy - bh / 2;
 
+    // Keep tooltip within bounds
+    if (tx + bw > size.width - 4) tx = touchPos!.dx - bw - 12;
+    if (ty < 4) ty = 4;
+    if (ty + bh > size.height - 4) ty = size.height - bh - 4;
+
+    // Gradient background
+    final rect = RRect.fromRectAndRadius(Rect.fromLTWH(tx, ty, bw, bh), Radius.circular(8));
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(tx, ty, bw, bh), const Radius.circular(6)),
-      Paint()..color = bg,
+      rect,
+      Paint()..color = Color(0xCC1A1A2E),
     );
+    canvas.drawRRect(
+      rect,
+      Paint()
+        ..color = col.withAlpha(30)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+
     for (var i = 0; i < lines.length; i++) {
       final tp = TextPainter(text: TextSpan(text: lines[i], style: sty), textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, Offset(tx + pad, ty + pad + i * 13));
+      tp.paint(canvas, Offset(tx + pad, ty + pad + i * 14));
     }
   }
 
@@ -361,7 +520,7 @@ class _CandlePainter extends CustomPainter {
         old.endIdx != endIdx ||
         old.scale != scale ||
         old.touchedIdx != touchedIdx ||
-        old.defaultVisible != defaultVisible ||
+        old.leftPadding != leftPadding ||
         old.ma5 != ma5 ||
         old.ma10 != ma10 ||
         old.ma20 != ma20;
