@@ -13,6 +13,41 @@ class WatchlistPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('自选股'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '搜索股票',
+            onPressed: () => context.go('/'),
+          ),
+          PopupMenuButton<WatchlistSort>(
+            icon: const Icon(Icons.sort),
+            tooltip: '排序',
+            onSelected: (sort) => context.read<WatchlistCubit>().setSortBy(sort),
+            itemBuilder: (ctx) {
+              final current = ctx.read<WatchlistCubit>().state.sortBy;
+              return [
+                PopupMenuItem(
+                  value: WatchlistSort.addedTime,
+                  child: Row(
+                    children: [
+                      if (current == WatchlistSort.addedTime) const Icon(Icons.check, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('添加时间'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: WatchlistSort.name,
+                  child: Row(
+                    children: [
+                      if (current == WatchlistSort.name) const Icon(Icons.check, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('名称'),
+                    ],
+                  ),
+                ),
+              ];
+            },
+          ),
           BlocBuilder<WatchlistCubit, WatchlistState>(
             builder: (context, state) {
               if (state.isSelectionMode) {
@@ -54,10 +89,11 @@ class WatchlistPage extends StatelessWidget {
             );
           }
 
+          final sortedItems = state.sortedItems;
           return ListView.builder(
-            itemCount: state.items.length,
+            itemCount: sortedItems.length,
             itemBuilder: (context, index) {
-              final item = state.items[index];
+              final item = sortedItems[index];
               final isSelected = state.selectedItems.contains(item.symbol);
 
               return Dismissible(
@@ -77,8 +113,8 @@ class WatchlistPage extends StatelessWidget {
                     backgroundColor: Theme.of(context).primaryColor,
                     child: Text(item.symbol.substring(0, item.symbol.length > 2 ? 2 : item.symbol.length)),
                   ),
-                  title: Text(item.name),
-                  subtitle: Text(item.symbol),
+                  title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  subtitle: Text(item.symbol, style: const TextStyle(fontSize: 11)),
                   trailing: state.isSelectionMode
                       ? Checkbox(value: isSelected, onChanged: (_) => context.read<WatchlistCubit>().toggleSelection(item.symbol))
                       : const Icon(Icons.chevron_right),

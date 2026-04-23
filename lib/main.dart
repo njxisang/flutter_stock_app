@@ -7,6 +7,7 @@ import 'data/datasources/stock_local_storage.dart';
 import 'presentation/blocs/stock/stock_bloc.dart';
 import 'presentation/blocs/chart/chart_state.dart';
 import 'presentation/blocs/watchlist/watchlist_cubit.dart';
+import 'presentation/blocs/settings/settings_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settingsState = SettingsState(settings: storage.getSettings());
+    final isDark = settingsState.settings['darkMode'] ?? false;
+
     return MultiBlocProvider(
       providers: [
         BlocProvider<StockBloc>(
@@ -43,6 +47,9 @@ class MyApp extends StatelessWidget {
         BlocProvider<WatchlistCubit>(
           create: (_) => WatchlistCubit(storage: storage),
         ),
+        BlocProvider<SettingsCubit>(
+          create: (_) => SettingsCubit(storage: storage),
+        ),
       ],
       child: MaterialApp.router(
         title: '股票MACD',
@@ -50,6 +57,7 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           primarySwatch: Colors.blue,
           useMaterial3: true,
+          brightness: isDark ? Brightness.dark : Brightness.light,
         ),
         routerConfig: AppRouter.router,
       ),

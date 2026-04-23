@@ -10,6 +10,7 @@ import '../../presentation/pages/risk_analysis_page.dart';
 import '../../presentation/pages/prediction_page.dart';
 import '../../presentation/pages/turtle_trading_page.dart';
 import '../../presentation/pages/portfolio_analysis_page.dart';
+import '../../presentation/pages/settings_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -73,6 +74,11 @@ class AppRouter {
             builder: (context, state) => const PredictionPage(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/settings',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SettingsPage(),
       ),
       GoRoute(
         path: '/turtle',
