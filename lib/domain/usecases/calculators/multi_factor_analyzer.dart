@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter_stock_app/domain/entities/stock_quote.dart';
 import 'macd_calculator.dart';
 import 'rsi_calculator.dart';
