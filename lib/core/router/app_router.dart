@@ -4,6 +4,12 @@ import '../../presentation/pages/main_page.dart';
 import '../../presentation/pages/watchlist_page.dart';
 import '../../presentation/pages/history_page.dart';
 import '../../presentation/pages/backtest_page.dart';
+import '../../presentation/pages/analysis_page.dart';
+import '../../presentation/pages/signal_analysis_page.dart';
+import '../../presentation/pages/risk_analysis_page.dart';
+import '../../presentation/pages/prediction_page.dart';
+import '../../presentation/pages/turtle_trading_page.dart';
+import '../../presentation/pages/portfolio_analysis_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -44,6 +50,39 @@ class AppRouter {
             ),
           ),
         ],
+      ),
+      // Analysis sub-pages (outside ShellRoute so no BottomNav)
+      GoRoute(
+        path: '/analysis',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AnalysisPage(),
+        routes: [
+          GoRoute(
+            path: 'signal',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (context, state) => const SignalAnalysisPage(),
+          ),
+          GoRoute(
+            path: 'risk',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (context, state) => const RiskAnalysisPage(),
+          ),
+          GoRoute(
+            path: 'prediction',
+            parentNavigatorKey: _rootNavigatorKey,
+            builder: (context, state) => const PredictionPage(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/turtle',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const TurtleTradingPage(),
+      ),
+      GoRoute(
+        path: '/portfolio',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PortfolioAnalysisPage(),
       ),
     ],
   );

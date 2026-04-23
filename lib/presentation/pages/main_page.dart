@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/stock/stock_bloc.dart';
@@ -194,6 +195,11 @@ class _MainPageState extends State<MainPage> {
                 style: TextStyle(color: isPositive ? AppColors.bullish : AppColors.bearish),
               ),
             ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.analytics_outlined),
+            tooltip: '多因子分析',
+            onPressed: () => context.go('/analysis'),
           ),
         ],
       ),
