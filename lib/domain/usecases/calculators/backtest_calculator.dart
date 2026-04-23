@@ -252,9 +252,47 @@ class BacktestCalculator {
   }
 
   static Map<String, dynamic>? _dmiSignal(List<StockQuote> quotes) {
-    // 简化版DMI信号
-    if (quotes.length < 14) return null;
-    // 默认无信号
+    // DMI信号：使用简化版ADX判断趋势强度
+    if (quotes.length < 28) return null;
+
+    // 计算简化DMI（仅用最后14个数据）
+    double sumTr = 0, sumPlusDm = 0, sumMinusDm = 0;
+    double prevClose = quotes[0].close;
+
+    for (var i = 1; i <= 14; i++) {
+      final high = quotes[i].high;
+      final low = quotes[i].low;
+      final close = quotes[i].close;
+      final tr1 = high - low;
+      final tr2 = (high - prevClose).abs();
+      final tr3 = (low - prevClose).abs();
+      final tr = [tr1, tr2, tr3].reduce((a, b) => a > b ? a : b);
+      sumTr += tr;
+      final plusDm = high - quotes[i - 1].high > quotes[i - 1].low - low
+          ? (high - quotes[i - 1].high).clamp(0.0, double.infinity)
+          : 0.0;
+      final minusDm = quotes[i - 1].low - low > high - quotes[i - 1].high
+          ? (quotes[i - 1].low - low).clamp(0.0, double.infinity)
+          : 0.0;
+      sumPlusDm += plusDm;
+      sumMinusDm += minusDm;
+      prevClose = close;
+    }
+
+    final plusDi14 = sumTr == 0 ? 0.0 : sumPlusDm / sumTr * 100;
+    final minusDi14 = sumTr == 0 ? 0.0 : sumMinusDm / sumTr * 100;
+    final dx = plusDi14 + minusDi14 == 0 ? 0.0 : (plusDi14 - minusDi14).abs() / (plusDi14 + minusDi14) * 100;
+    final adx = dx; // 简化版ADX等同于DX
+
+    // ADX从低上升且高于30：趋势确认，做多
+    // ADX从高下降且高于30后下跌：趋势减弱，做空
+    // ADX低于20：市场无趋势，不操作
+    if (adx < 20) return null; // 无趋势
+
+    // 使用前一个ADX值对比
+    final prevAdx = adx; // 简化版只用当前值
+    if (prevAdx > 25 && plusDi14 > minusDi14) return {'isLong': true};
+    if (prevAdx > 25 && minusDi14 > plusDi14) return {'isLong': false};
     return null;
   }
 

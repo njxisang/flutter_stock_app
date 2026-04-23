@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../../domain/usecases/calculators/multi_factor_analyzer.dart';
 import '../blocs/stock/stock_bloc.dart';
@@ -273,7 +274,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
 
   Widget _buildActionButton(BuildContext context, String label, String route, IconData icon) {
     return ElevatedButton.icon(
-      onPressed: () => Navigator.of(context).pushNamed(route),
+      onPressed: () => context.go(route),
       icon: Icon(icon, size: 18),
       label: Text(label, style: const TextStyle(fontSize: 12)),
       style: ElevatedButton.styleFrom(

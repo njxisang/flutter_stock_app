@@ -17,7 +17,6 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   final _searchController = TextEditingController();
-  int _currentTabIndex = 0;
 
   final _tabNames = ['K线', 'MACD', 'RSI', 'KDJ', 'BOLL', 'MA', 'WR', 'DMI', '分布'];
 
@@ -95,35 +94,38 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildTabBar() {
-    return SizedBox(
-      height: 48,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _tabNames.length,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () {
-              setState(() => _currentTabIndex = index);
-              context.read<ChartCubit>().changeTab(index);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _currentTabIndex == index ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _tabNames[index],
-                style: TextStyle(
-                  color: _currentTabIndex == index ? Colors.white : AppColors.textPrimary,
-                  fontWeight: _currentTabIndex == index ? FontWeight.bold : FontWeight.normal,
+    return BlocBuilder<ChartCubit, ChartState>(
+      buildWhen: (prev, curr) => prev.currentTab != curr.currentTab,
+      builder: (context, chartState) {
+        return SizedBox(
+          height: 48,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _tabNames.length,
+            itemBuilder: (context, index) {
+              final isSelected = chartState.currentTab == index;
+              return GestureDetector(
+                onTap: () => context.read<ChartCubit>().changeTab(index),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _tabNames[index],
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -139,12 +141,16 @@ class _MainPageState extends State<MainPage> {
         }
 
         if (state is StockLoaded) {
-          return Column(
-            children: [
-              _buildStockInfo(state.stockData),
-              _buildSignalIndicator(state),
-              Expanded(child: _buildChart(state)),
-            ],
+          // Listen to ChartCubit to rebuild chart when tab changes
+          return BlocBuilder<ChartCubit, ChartState>(
+            buildWhen: (prev, curr) => prev.currentTab != curr.currentTab,
+            builder: (context, chartState) => Column(
+              children: [
+                _buildStockInfo(state.stockData),
+                _buildSignalIndicator(state),
+                Expanded(child: _buildChart(state)),
+              ],
+            ),
           );
         }
 
@@ -199,7 +205,8 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildSignalIndicator(StockLoaded state) {
-    if (_currentTabIndex == 1 && state.macdSignal != null) {
+    final chartTab = context.watch<ChartCubit>().state.currentTab;
+    if (chartTab == 1 && state.macdSignal != null) {
       final signal = state.macdSignal!;
       final isGolden = signal.signal == MacdSignal.goldenCross;
 
@@ -233,9 +240,10 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildChart(StockLoaded state) {
-    switch (_currentTabIndex) {
+    final chartTab = context.watch<ChartCubit>().state.currentTab;
+    switch (chartTab) {
       case 0:
-        return _buildKLineChart(state.stockData.quotes);
+        return _buildKLineChart(state.stockData.quotes, state.maData);
       case 1:
         return _buildMacdChart(state.macdData);
       case 2:
@@ -253,45 +261,24 @@ class _MainPageState extends State<MainPage> {
       case 8:
         return _buildDistributionChart(state.stockData.quotes);
       default:
-        return _buildKLineChart(state.stockData.quotes);
+        return _buildKLineChart(state.stockData.quotes, state.maData);
     }
   }
 
-  Widget _buildKLineChart(List<StockQuote> quotes) {
+  Widget _buildKLineChart(List<StockQuote> quotes, List<MaData> maData) {
     final displayQuotes = quotes.length > 100 ? quotes.sublist(quotes.length - 100) : quotes;
     if (displayQuotes.isEmpty) return const Center(child: Text('数据不足'));
-
-    // Compute MA overlays
-    final ma5 = _computeMa(displayQuotes, 5);
-    final ma10 = _computeMa(displayQuotes, 10);
-    final ma20 = _computeMa(displayQuotes, 20);
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: CandleChartWidget(
         quotes: displayQuotes,
-        ma5: ma5,
-        ma10: ma10,
-        ma20: ma20,
+        maData: maData,
       ),
     );
   }
 
-  List<double?> _computeMa(List<StockQuote> quotes, int period) {
-    final result = <double?>[];
-    for (var i = 0; i < quotes.length; i++) {
-      if (i < period - 1) {
-        result.add(null);
-      } else {
-        double sum = 0;
-        for (var j = 0; j < period; j++) {
-          sum += quotes[i - j].close;
-        }
-        result.add(sum / period);
-      }
-    }
-    return result;
-  }
+  // Removed duplicate _computeMa method - now uses MaData from StockLoaded state
 
   Widget _buildMacdChart(List<MacdData> data) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
