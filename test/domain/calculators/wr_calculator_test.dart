@@ -42,6 +42,7 @@ void main() {
 
     test('should calculate WR6 with correct 6-period lookback', () {
       // WR6 should use 6 periods (i-5 to i)
+      // FIX: close=high makes WR6=0 (close at top of range), test expected <50
       final quotes = List.generate(
         15,
         (i) => StockQuote(
@@ -49,14 +50,14 @@ void main() {
           open: 10.0,
           high: 11.0 + i * 0.5, // Increasing high
           low: 9.0,
-          close: 10.5,
+          close: 11.0 + i * 0.5, // close = high → WR should be near 0
           volume: 1000,
         ),
       );
 
       final result = WrCalculator.calculate(quotes);
       expect(result, isNotEmpty);
-      // When close is near the high, WR should be low (close to 0)
+      // When close equals high, WR should be 0 (close to 0, definitely < 50)
       expect(result.last.wr6, lessThan(50));
     });
 

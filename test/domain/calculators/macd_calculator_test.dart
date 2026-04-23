@@ -58,9 +58,9 @@ void main() {
 
     test('should detect golden cross signal', () {
       final quotes = <StockQuote>[];
-      // Generate quotes with upward trend to create golden cross
-      for (var i = 0; i < 30; i++) {
-        final close = 10.0 + i * 0.2;
+      // FIX: MACD(12,26,9) needs >35 periods; use exponential trend to force DIF>DEA crossover
+      for (var i = 0; i < 60; i++) {
+        final close = 10.0 + (i * i * 0.01); // accelerating upward trend
         quotes.add(StockQuote(
           date: '2024-01-${(i + 1).toString().padLeft(2, '0')}',
           open: close - 0.1,
