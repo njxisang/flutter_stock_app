@@ -94,6 +94,7 @@ class StockError extends StockState {
 class StockBloc extends Bloc<StockEvent, StockState> {
   final StockApiService apiService;
   final StockLocalStorage storage;
+  StockLocalStorage get stockStorage => storage;
 
   String _currentSymbol = '';
   String _startDate = '';

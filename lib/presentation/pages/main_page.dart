@@ -7,6 +7,7 @@ import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/stock/stock_bloc.dart';
 import '../blocs/chart/chart_state.dart';
+import '../../data/datasources/stock_local_storage.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -33,8 +34,8 @@ class _MainPageState extends State<MainPage> {
         title: const Text(AppStrings.appName),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showSettingsDialog(context),
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.go('/settings'),
           ),
         ],
       ),
@@ -50,18 +51,56 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildSearchBar() {
+    // Watch StockBloc so Autocomplete rebuilds when history changes
+    context.watch<StockBloc>();
+    final storage = context.read<StockBloc>().stockStorage;
+    final history = storage.getSearchHistory();
+
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: AppStrings.searchHint,
-                border: OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
+            child: Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return history.take(5);
+                }
+                return history.where((s) =>
+                    s.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+              },
+              onSelected: (String symbol) {
+                _searchController.text = symbol;
+                _searchStock();
+              },
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                // Sync with our controller
+                controller.text = _searchController.text;
+                controller.addListener(() {
+                  if (_searchController.text != controller.text) {
+                    _searchController.text = controller.text;
+                  }
+                });
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    hintText: AppStrings.searchHint,
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    suffixIcon: controller.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              controller.clear();
+                              _searchController.clear();
+                            },
+                          )
+                        : null,
+                  ),
+                  onSubmitted: (_) => _searchStock(),
+                );
+              },
             ),
           ),
           const SizedBox(width: 8),
@@ -74,21 +113,74 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
+  static const _dateRanges = <Map<String, dynamic>>[
+    {'label': '近1周',  'days': 7},
+    {'label': '近1月',  'days': 30},
+    {'label': '近3月',  'days': 90},
+    {'label': '近6月',  'days': 180},
+    {'label': '近1年',  'days': 365},
+    {'label': '近5年',  'days': 1825},
+  ];
+
+  String _selectedRange = '近1月';
+
+  String _daysToDateRange(int days) {
+    final now = DateTime.now();
+    final end = now;
+    final start = end.subtract(Duration(days: days));
+    return '${_fmtDate(start)} ~ ${_fmtDate(end)}';
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  void _onRangeSelected(String label, int days) {
+    setState(() => _selectedRange = label);
+    final range = _daysToDateRange(days);
+    final parts = range.split(' ~ ');
+    context.read<StockBloc>().add(ChangeDateRange(parts[0], parts[1]));
+  }
+
   Widget _buildDateRange() {
     return BlocBuilder<StockBloc, StockState>(
       builder: (context, state) {
-        if (state is StockLoaded) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('${state.startDate} ~ ${state.endDate}', style: const TextStyle(fontSize: 12)),
-              ],
-            ),
-          );
-        }
-        return const SizedBox.shrink();
+        final hasData = state is StockLoaded;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasData)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
+                  child: Text(
+                    '${(state as StockLoaded).startDate} ~ ${state.endDate}',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                ),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _dateRanges.map((r) {
+                    final selected = r['label'] == _selectedRange;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(r['label'], style: const TextStyle(fontSize: 12)),
+                        selected: selected,
+                        selectedColor: AppColors.primary.withAlpha(51),
+                        onSelected: (_) => _onRangeSelected(r['label'], r['days'] as int),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -130,14 +222,40 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildChartContent() {
-    return BlocBuilder<StockBloc, StockState>(
+    return BlocConsumer<StockBloc, StockState>(
+      listener: (context, state) {
+        if (state is StockError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
       builder: (context, state) {
         if (state is StockLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (state is StockError) {
-          return Center(child: Text(state.message));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                const SizedBox(height: 8),
+                Text(state.message, style: const TextStyle(color: AppColors.textSecondary)),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<StockBloc>().add(RefreshStock()),
+                  child: const Text('重试'),
+                ),
+              ],
+            ),
+          );
         }
 
         if (state is StockLoaded) {
@@ -516,19 +634,4 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
-  void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.settings),
-        content: const Text('设置功能开发中...'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
 }
