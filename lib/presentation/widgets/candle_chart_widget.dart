@@ -6,16 +6,12 @@ import '../../core/constants/app_constants.dart';
 /// Real OHLC candlestick chart with MA overlays using CustomPainter.
 class CandleChartWidget extends StatefulWidget {
   final List<StockQuote> quotes;
-  final List<double?> ma5;
-  final List<double?> ma10;
-  final List<double?> ma20;
+  final List<MaData> maData;
 
   const CandleChartWidget({
     super.key,
     required this.quotes,
-    required this.ma5,
-    required this.ma10,
-    required this.ma20,
+    required this.maData,
   });
 
   @override
@@ -39,12 +35,46 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
 
   int get _displayCount => (_endIdx - _startIdx).clamp(1, widget.quotes.length);
 
+  /// Returns MA arrays aligned with displayQuotes.
+  /// maData[i] corresponds to quotes[i + MA_DATA_START_OFFSET] in the full quotes list.
+  /// Since displayQuotes is a sublist of the last N quotes, we need to map display indices
+  /// to maData indices correctly.
+  ({List<double?> ma5, List<double?> ma10, List<double?> ma20}) _getAlignedMa() {
+    final ma5 = <double?>[];
+    final ma10 = <double?>[];
+    final ma20 = <double?>[];
+    // maData starts from index 59 in the full quotes list (first point where MA60 is valid)
+    const maDataStartOffset = 59;
+
+    // Calculate the index in the full quotes list where displayQuotes starts
+    final isTruncated = widget.quotes.length > _defaultVisible;
+    final fullQuotesStartIdx = isTruncated ? widget.quotes.length - _defaultVisible : 0;
+
+    for (var i = 0; i < _displayCount; i++) {
+      // The actual index in the full quotes list for this display element
+      final actualQuoteIdx = fullQuotesStartIdx + i;
+      final maIdx = actualQuoteIdx - maDataStartOffset;
+      if (maIdx < 0 || maIdx >= widget.maData.length) {
+        ma5.add(null);
+        ma10.add(null);
+        ma20.add(null);
+      } else {
+        final md = widget.maData[maIdx];
+        ma5.add(md.ma5);
+        ma10.add(md.ma10);
+        ma20.add(md.ma20);
+      }
+    }
+    return (ma5: ma5, ma10: ma10, ma20: ma20);
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
+        final alignedMa = _getAlignedMa();
 
         return GestureDetector(
           onScaleUpdate: (details) {
@@ -81,14 +111,15 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
             size: Size(w, h),
             painter: _CandlePainter(
               quotes: widget.quotes,
-              ma5: widget.ma5,
-              ma10: widget.ma10,
-              ma20: widget.ma20,
+              ma5: alignedMa.ma5,
+              ma10: alignedMa.ma10,
+              ma20: alignedMa.ma20,
               startIdx: _startIdx,
               endIdx: _endIdx,
               scale: _scale,
               touchedIdx: _touchedIdx,
               touchPos: _touchPos,
+              defaultVisible: _defaultVisible,
             ),
           ),
         );
@@ -107,6 +138,7 @@ class _CandlePainter extends CustomPainter {
   final double scale;
   final int? touchedIdx;
   final Offset? touchPos;
+  final int defaultVisible;
 
   static const double _lp = 8.0;
   static const double _rp = 55.0;
@@ -123,6 +155,7 @@ class _CandlePainter extends CustomPainter {
     required this.scale,
     this.touchedIdx,
     this.touchPos,
+    required this.defaultVisible,
   });
 
   @override
@@ -244,8 +277,9 @@ class _CandlePainter extends CustomPainter {
     var started = false;
     double lastX = 0, lastY = 0;
 
+    // ma is now pre-aligned to displayQuotes indices, so use i directly (not start + i)
     for (var i = 0; i < displayQuotes.length; i++) {
-      final v = ma[start + i];
+      final v = ma[i];
       if (v == null) continue;
       final x = _lp + i * cw + cw / 2;
       final y = _tp + ch * (1 - (v - minP) / priceRange);
@@ -319,6 +353,10 @@ class _CandlePainter extends CustomPainter {
     return old.startIdx != startIdx ||
         old.endIdx != endIdx ||
         old.scale != scale ||
-        old.touchedIdx != touchedIdx;
+        old.touchedIdx != touchedIdx ||
+        old.defaultVisible != defaultVisible ||
+        old.ma5 != ma5 ||
+        old.ma10 != ma10 ||
+        old.ma20 != ma20;
   }
 }
