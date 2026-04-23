@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/candle_chart_widget.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/stock/stock_bloc.dart';
@@ -267,29 +268,38 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildKLineChart(List<StockQuote> quotes) {
     final displayQuotes = quotes.length > 100 ? quotes.sublist(quotes.length - 100) : quotes;
+    if (displayQuotes.isEmpty) return const Center(child: Text('数据不足'));
+
+    // Compute MA overlays
+    final ma5 = _computeMa(displayQuotes, 5);
+    final ma10 = _computeMa(displayQuotes, 10);
+    final ma20 = _computeMa(displayQuotes, 20);
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: BarChart(
-        BarChartData(
-          barGroups: displayQuotes.asMap().entries.map((entry) {
-            final quote = entry.value;
-            final isUp = quote.close >= quote.open;
-            return BarChartGroupData(
-              x: entry.key,
-              barRods: [
-                BarChartRodData(
-                  toY: quote.high,
-                  fromY: quote.low,
-                  color: isUp ? AppColors.bullish : AppColors.bearish,
-                  width: 8,
-                ),
-              ],
-            );
-          }).toList(),
-        ),
+      child: CandleChartWidget(
+        quotes: displayQuotes,
+        ma5: ma5,
+        ma10: ma10,
+        ma20: ma20,
       ),
     );
+  }
+
+  List<double?> _computeMa(List<StockQuote> quotes, int period) {
+    final result = <double?>[];
+    for (var i = 0; i < quotes.length; i++) {
+      if (i < period - 1) {
+        result.add(null);
+      } else {
+        double sum = 0;
+        for (var j = 0; j < period; j++) {
+          sum += quotes[i - j].close;
+        }
+        result.add(sum / period);
+      }
+    }
+    return result;
   }
 
   Widget _buildMacdChart(List<MacdData> data) {
