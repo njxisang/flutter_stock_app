@@ -140,8 +140,8 @@ https://push2his.eastmoney.com/api/qt/stock/kline/get
 # Flutter 版本
 Flutter 3.24.0 / Dart 3.5.0
 
-# 通过 fvm 管理版本
-/home/xisang/fvm/versions/3.24.0/bin/flutter
+# 通过 fvm 管理版本（如未安装 fvm，直接使用 flutter 命令）
+fvm flutter
 
 # 安装依赖
 flutter pub get
@@ -161,9 +161,9 @@ flutter build apk --release
 - JDK 17（如遇 Gradle 报错，检查 JAVA_HOME）
 - 网络权限（INTERNET）
 
-**JAVA_HOME 参考值**
-```
-JAVA_HOME=/home/xisang/miniconda3/pkgs/openjdk-17.0.18-ha668962_0/lib/jvm
+**JAVA_HOME**（Mac/Linux 示例，Windows 格式类似）
+```bash
+export JAVA_HOME=/path/to/jdk17/lib/jvm
 ```
 
 ---
@@ -176,10 +176,10 @@ JAVA_HOME=/home/xisang/miniconda3/pkgs/openjdk-17.0.18-ha668962_0/lib/jvm
 
 ```bash
 # 1. 编辑源像素图（Neon 风格，512x512，6px 像素块）
-#    路径 /tmp/stock_app_icon_pixel.png
+#    保存为 /tmp/stock_app_icon_pixel.png
 
 # 2. 运行生成脚本（需要 Pillow）
-/home/xisang/miniconda3/envs/a-trade-env/bin/python3 /tmp/gen_flutter_icons.py
+python3 /tmp/gen_flutter_icons.py
 
 # 3. 提交
 git add android/app/src/main/res/mipmap-*/
