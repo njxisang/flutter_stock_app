@@ -106,7 +106,7 @@ class ScaffoldWithNav extends StatefulWidget {
 class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
   int _currentIndex = 0;
 
-  static const _routes = ['/', '/watchlist', '/history', '/backtest'];
+  static const _routes = ['/', '/watchlist', '/history', '/backtest', '/turtle', '/portfolio'];
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +120,8 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
           NavigationDestination(icon: Icon(Icons.star), label: '自选'),
           NavigationDestination(icon: Icon(Icons.history), label: '历史'),
           NavigationDestination(icon: Icon(Icons.play_arrow), label: '回测'),
+          NavigationDestination(icon: Icon(Icons.settings), label: '海龟'),
+          NavigationDestination(icon: Icon(Icons.pie_chart), label: '组合'),
         ],
       ),
     );
@@ -130,6 +132,8 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
     if (location.startsWith('/watchlist')) return 1;
     if (location.startsWith('/history')) return 2;
     if (location.startsWith('/backtest')) return 3;
+    if (location.startsWith('/turtle')) return 4;
+    if (location.startsWith('/portfolio')) return 5;
     return 0;
   }
 
