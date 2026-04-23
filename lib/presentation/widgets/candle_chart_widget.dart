@@ -116,10 +116,6 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
               }
             });
           },
-          onPanUpdate: (d) {
-            if (_touchedIdx != null) setState(() => _touchPos = d.localPosition);
-          },
-          onPanEnd: (_) => setState(() { _touchedIdx = null; _touchPos = null; }),
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.chartBackground,
