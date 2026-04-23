@@ -47,15 +47,6 @@ class _MainPageState extends State<MainPage> {
           Expanded(child: _buildChartContent()),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: '图表'),
-          BottomNavigationBarItem(icon: Icon(Icons.star), label: '自选'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: '历史'),
-          BottomNavigationBarItem(icon: Icon(Icons.play_arrow), label: '回测'),
-        ],
-      ),
     );
   }
 
