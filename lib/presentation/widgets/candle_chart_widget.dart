@@ -217,7 +217,7 @@ class _CandlePainter extends CustomPainter {
     _drawGrid(canvas, size, priceChartHeight, minP, maxP);
     _drawPriceLabels(canvas, size, priceChartHeight, minP, maxP);
     _drawDateLabels(canvas, size, displayQuotes, cw);
-    _drawCandlesticks(canvas, displayQuotes, cw, bodyW, p2y);
+    _drawCandlesticks(canvas, displayQuotes, cw, bodyW, p2y, minP);
     _drawVolume(canvas, displayQuotes, cw, bodyW);
     _drawMaLines(canvas, displayQuotes, cw, priceChartHeight, minP, priceRange);
     _drawCrosshair(canvas, size, displayQuotes, cw, p2y);
@@ -277,7 +277,7 @@ class _CandlePainter extends CustomPainter {
   }
 
   void _drawCandlesticks(Canvas canvas, List<StockQuote> displayQuotes, double cw, double bodyW,
-      double Function(double) p2y) {
+      double Function(double) p2y, double minP) {
     for (var i = 0; i < displayQuotes.length; i++) {
       final q = displayQuotes[i];
       final x = leftPadding + i * cw + cw / 2;
@@ -407,8 +407,8 @@ class _CandlePainter extends CustomPainter {
         text: TextSpan(text: label, style: TextStyle(color: paint.color, fontSize: 9, fontWeight: FontWeight.bold)),
         textDirection: TextDirection.ltr,
       )..layout();
-      final labelX = (lastX + 4).clamp(0, chartWidth - 30);
-      final labelY = (lastY - lb.height - 2).clamp(topPadding, topPadding + priceChartHeight - lb.height);
+      final labelX = (lastX + 4).clamp(0.0, chartWidth - 30).toDouble();
+      final labelY = (lastY - lb.height - 2).clamp(topPadding, topPadding + priceChartHeight - lb.height).toDouble();
       lb.paint(canvas, Offset(labelX, labelY));
     }
   }
