@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/router/app_router.dart';
 import 'data/datasources/stock_api_service.dart';
 import 'data/datasources/stock_local_storage.dart';
 import 'presentation/blocs/stock/stock_bloc.dart';
 import 'presentation/blocs/chart/chart_state.dart';
 import 'presentation/blocs/watchlist/watchlist_cubit.dart';
-import 'presentation/pages/main_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,14 +44,14 @@ class MyApp extends StatelessWidget {
           create: (_) => WatchlistCubit(storage: storage),
         ),
       ],
-      child: MaterialApp(
+      child: MaterialApp.router(
         title: '股票MACD',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blue,
           useMaterial3: true,
         ),
-        home: const MainPage(),
+        routerConfig: AppRouter.router,
       ),
     );
   }

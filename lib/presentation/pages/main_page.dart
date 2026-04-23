@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
-import '../../domain/usecases/calculators/macd_calculator.dart';
 import '../blocs/stock/stock_bloc.dart';
 import '../blocs/chart/chart_state.dart';
 
@@ -210,7 +209,7 @@ class _MainPageState extends State<MainPage> {
         padding: const EdgeInsets.all(8),
         margin: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: (isGolden ? AppColors.bullish : AppColors.bearish).withOpacity(0.1),
+          color: (isGolden ? AppColors.bullish : AppColors.bearish).withAlpha(25),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(

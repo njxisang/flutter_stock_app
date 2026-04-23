@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter_stock_app/domain/entities/stock_quote.dart';
 
 class KdjCalculator {
@@ -11,7 +10,6 @@ class KdjCalculator {
     final result = <KdjData>[];
     double? prevK;
     double? prevD;
-    double? prevJ;
 
     for (var i = period - 1; i < quotes.length; i++) {
       // 计算RSV
@@ -41,7 +39,6 @@ class KdjCalculator {
 
       prevK = k;
       prevD = d;
-      prevJ = j;
     }
 
     return result;

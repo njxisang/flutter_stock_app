@@ -65,7 +65,7 @@ class PredictionPoint {
 class HoltPredictor {
   /// Holt双指数平滑预测
   static HoltResult predict(List<StockQuote> quotes, int days) {
-    if (quotes.length < 10) return HoltResult(0, 0, quotes.last?.close ?? 100);
+    if (quotes.length < 10) return HoltResult(0, 0, quotes.last.close);
 
     final closes = quotes.map((q) => q.close).toList();
     final n = closes.length;
@@ -117,7 +117,7 @@ class SimpleArimaPredictor {
   /// 简化ARIMA预测
   /// FIXED: 修正置信度计算
   static ArimaResult predict(List<StockQuote> quotes, int days) {
-    if (quotes.length < 20) return ArimaResult(0, 0, quotes.last?.close ?? 100);
+    if (quotes.length < 20) return ArimaResult(0, 0, quotes.last.close);
 
     final closes = quotes.map((q) => q.close).toList();
 

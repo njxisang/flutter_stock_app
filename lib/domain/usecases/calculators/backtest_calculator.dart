@@ -61,8 +61,6 @@ class BacktestCalculator {
         totalProfit += netProfit;
         capital += netProfit;
 
-        final holdingDays = quotes.indexOf(quotes.firstWhere((q) => q.date == entryDate)).clamp(0, quotes.length - 1);
-
         trades.add(Trade(
           entryDate: entryDate,
           entryPrice: entryPrice,
