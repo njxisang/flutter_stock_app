@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:math';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/watchlist/watchlist_cubit.dart';
@@ -18,7 +19,13 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('组合分析')),
+      appBar: AppBar(
+        title: const Text('组合分析'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+        ),
+      ),
       body: BlocBuilder<WatchlistCubit, WatchlistState>(
         builder: (context, state) {
           if (state.items.isEmpty) {
@@ -33,8 +40,8 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
                   const Text('至少需要2只股票进行组合分析', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('返回'),
+                    onPressed: () => context.go('/'),
+                    child: const Text('去添加'),
                   ),
                 ],
               ),
@@ -51,8 +58,8 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
                   const Text('至少需要2只股票', style: TextStyle(fontSize: 16, color: Colors.grey)),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('返回'),
+                    onPressed: () => context.go('/'),
+                    child: const Text('去添加'),
                   ),
                 ],
               ),

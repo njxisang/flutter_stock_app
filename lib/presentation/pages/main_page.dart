@@ -286,8 +286,12 @@ class _MainPageState extends State<MainPage> {
         : 0.0;
     final isPositive = change >= 0;
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
+    // Check if already in watchlist
+    final watchlistState = context.watch<WatchlistCubit>().state;
+    final isInWatchlist = watchlistState.items.any((item) => item.symbol == data.symbol);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
           Expanded(
@@ -295,6 +299,7 @@ class _MainPageState extends State<MainPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(data.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
                 Text(data.symbol, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
@@ -308,23 +313,47 @@ class _MainPageState extends State<MainPage> {
               ),
               Text(
                 '${isPositive ? '+' : ''}${change.toStringAsFixed(2)} (${changePercent.toStringAsFixed(2)}%)',
-                style: TextStyle(color: isPositive ? AppColors.bullish : AppColors.bearish),
+                style: TextStyle(color: isPositive ? AppColors.bullish : AppColors.bearish, fontSize: 12),
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.star_border),
-            tooltip: '添加自选',
-            onPressed: () {
-              context.read<WatchlistCubit>().addToWatchlist(data.symbol, data.name);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${data.name} 已添加到自选'),
-                  duration: const Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
+          const SizedBox(width: 8),
+          // Watchlist button - more prominent
+          Material(
+            color: isInWatchlist ? Colors.amber.withAlpha(51) : Colors.grey.withAlpha(25),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                if (isInWatchlist) {
+                  context.read<WatchlistCubit>().removeFromWatchlist(data.symbol);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${data.name} 已从自选移除'),
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else {
+                  context.read<WatchlistCubit>().addToWatchlist(data.symbol, data.name);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${data.name} 已添加到自选'),
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  isInWatchlist ? Icons.star : Icons.star_border,
+                  color: isInWatchlist ? Colors.amber : Colors.grey,
+                  size: 28,
                 ),
-              );
-            },
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
