@@ -297,8 +297,8 @@ class _CandlePainter extends CustomPainter {
       final x = leftPadding + i * cw + cw / 2;
       final isUp = q.close >= q.open;
 
-      final bullColor = Color(0xFF00C853);
-      final bearColor = Color(0xFFFF1744);
+      final bullColor = Color(0xFFDC3535);  // Red for up (Chinese convention)
+      final bearColor = Color(0xFF2E8B57);  // Green for down (Chinese convention)
       final col = isUp ? bullColor : bearColor;
 
       // Clamp values to ensure they stay within price area
@@ -371,7 +371,7 @@ class _CandlePainter extends CustomPainter {
       final q = displayQuotes[i];
       final x = leftPadding + i * cw + cw / 2;
       final isUp = q.close >= q.open;
-      final col = isUp ? Color(0xFF00C853).withAlpha(80) : Color(0xFFFF1744).withAlpha(80);
+      final col = isUp ? Color(0xFFDC3535).withAlpha(80) : Color(0xFF2E8B57).withAlpha(80);
 
       final volHeight = (volumeHeight * 0.9 * ((q.close - q.open).abs() / maxVol)).clamp(1.0, volumeHeight * 0.9);
       canvas.drawRRect(
@@ -463,7 +463,7 @@ class _CandlePainter extends CustomPainter {
         Rect.fromLTWH(leftPadding - priceTag.width - 8, y - priceTag.height / 2, priceTag.width + 8, priceTag.height),
         Radius.circular(3),
       ),
-      Paint()..color = Color(0xFF00C853),
+      Paint()..color = Color(0xFFDC3535),
     );
     priceTag.paint(canvas, Offset(leftPadding - priceTag.width - 4, y - priceTag.height / 2));
   }
@@ -473,7 +473,7 @@ class _CandlePainter extends CustomPainter {
 
     final q = displayQuotes[touchedIdx!];
     final isUp = q.close >= q.open;
-    final col = isUp ? Color(0xFF00C853) : Color(0xFFFF1744);
+    final col = isUp ? Color(0xFFDC3535) : Color(0xFF2E8B57);
     final change = ((q.close - q.open) / q.open * 100);
 
     final lines = <String>[
