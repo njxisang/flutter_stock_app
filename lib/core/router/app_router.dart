@@ -50,6 +50,18 @@ class AppRouter {
               child: BacktestPage(),
             ),
           ),
+          GoRoute(
+            path: '/turtle',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: TurtleTradingPage(),
+            ),
+          ),
+          GoRoute(
+            path: '/portfolio',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: PortfolioAnalysisPage(),
+            ),
+          ),
         ],
       ),
       // Analysis sub-pages (outside ShellRoute so no BottomNav)
@@ -79,16 +91,6 @@ class AppRouter {
         path: '/settings',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SettingsPage(),
-      ),
-      GoRoute(
-        path: '/turtle',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const TurtleTradingPage(),
-      ),
-      GoRoute(
-        path: '/portfolio',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const PortfolioAnalysisPage(),
       ),
     ],
   );
