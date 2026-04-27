@@ -76,6 +76,7 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
+        final alignedMa = _getAlignedMa();
 
         // Responsive padding based on screen width
         final leftPadding = w > 400 ? 56.0 : (w > 300 ? 48.0 : 40.0);
@@ -384,6 +385,7 @@ class _CandlePainter extends CustomPainter {
     var started = false;
     double lastX = 0, lastY = 0;
 
+    // ma is now pre-aligned to displayQuotes indices, so use i directly (not start + i)
     for (var i = 0; i < displayQuotes.length; i++) {
       final v = ma[i];
       if (v == null) continue;
