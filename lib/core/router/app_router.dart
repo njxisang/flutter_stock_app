@@ -118,11 +118,11 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
         selectedIndex: _calculateSelectedIndex(context),
         onDestinationSelected: (index) => _onItemTapped(context, index),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.show_chart), label: '图表'),
+          NavigationDestination(icon: Icon(Icons.show_chart), label: 'K线'),
           NavigationDestination(icon: Icon(Icons.star), label: '自选'),
           NavigationDestination(icon: Icon(Icons.history), label: '历史'),
           NavigationDestination(icon: Icon(Icons.play_arrow), label: '回测'),
-          NavigationDestination(icon: Icon(Icons.settings), label: '海龟'),
+          NavigationDestination(icon: Icon(Icons.catching_pokemon), label: '海龟'),
           NavigationDestination(icon: Icon(Icons.pie_chart), label: '组合'),
         ],
       ),

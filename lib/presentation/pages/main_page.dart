@@ -16,167 +16,224 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
+  late TabController _tabController;
 
-  final _tabNames = ['K线', 'MACD', 'RSI', 'KDJ', 'BOLL', 'MA', 'WR', 'DMI', '分布'];
+  final _tabNames = ['K线', '分时', '日K', '周K', '月K', '指数'];
+  final _indicatorTabs = ['MACD', 'RSI', 'KDJ', 'BOLL', 'MA', 'WR', 'DMI'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabNames.length, vsync: this);
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.appName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => context.go('/settings'),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildDateRange(),
-          _buildTabBar(),
-          Expanded(child: _buildChartContent()),
-        ],
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildSearchBar(),
+            Expanded(child: _buildChartContent()),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    // Watch StockBloc so Autocomplete rebuilds when history changes
-    context.watch<StockBloc>();
-    final storage = context.read<StockBloc>().stockStorage;
-    final history = storage.getSearchHistory();
-
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return history.take(5);
-                }
-                return history.where((s) =>
-                    s.toLowerCase().contains(textEditingValue.text.toLowerCase()));
-              },
-              onSelected: (String symbol) {
-                _searchController.text = symbol;
-                _searchStock();
-              },
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                // Sync with our controller
-                controller.text = _searchController.text;
-                controller.addListener(() {
-                  if (_searchController.text != controller.text) {
-                    _searchController.text = controller.text;
-                  }
-                });
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: InputDecoration(
-                    hintText: AppStrings.searchHint,
-                    border: const OutlineInputBorder(),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    suffixIcon: controller.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              controller.clear();
-                              _searchController.clear();
-                            },
-                          )
-                        : null,
-                  ),
-                  onSubmitted: (_) => _searchStock(),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: _searchStock,
-            child: const Text(AppStrings.search),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static const _dateRanges = <Map<String, dynamic>>[
-    {'label': '近1周',  'days': 7},
-    {'label': '近1月',  'days': 30},
-    {'label': '近3月',  'days': 90},
-    {'label': '近6月',  'days': 180},
-    {'label': '近1年',  'days': 365},
-    {'label': '近5年',  'days': 1825},
-  ];
-
-  String _selectedRange = '近1月';
-
-  String _daysToDateRange(int days) {
-    final now = DateTime.now();
-    final end = now;
-    final start = end.subtract(Duration(days: days));
-    return '${_fmtDate(start)} ~ ${_fmtDate(end)}';
-  }
-
-  String _fmtDate(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  void _onRangeSelected(String label, int days) {
-    setState(() => _selectedRange = label);
-    final range = _daysToDateRange(days);
-    final parts = range.split(' ~ ');
-    context.read<StockBloc>().add(ChangeDateRange(parts[0], parts[1]));
-  }
-
-  Widget _buildDateRange() {
+  Widget _buildHeader() {
     return BlocBuilder<StockBloc, StockState>(
       builder: (context, state) {
-        final hasData = state is StockLoaded;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (hasData)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Text(
-                    '${(state as StockLoaded).startDate} ~ ${state.endDate}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  ),
-                ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _dateRanges.map((r) {
-                    final selected = r['label'] == _selectedRange;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        label: Text(r['label'], style: const TextStyle(fontSize: 12)),
-                        selected: selected,
-                        selectedColor: AppColors.primary.withAlpha(51),
-                        onSelected: (_) => _onRangeSelected(r['label'], r['days'] as int),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        if (state is StockLoaded) {
+          final data = state.stockData;
+          final change = data.quotes.length > 1
+              ? data.quotes.last.close - data.quotes[data.quotes.length - 2].close
+              : 0.0;
+          final changePercent = data.quotes.length > 1
+              ? (change / data.quotes[data.quotes.length - 2].close) * 100
+              : 0.0;
+          final isPositive = change >= 0;
+          final changeColor = isPositive ? AppColors.bullish : AppColors.bearish;
+
+          final watchlistState = context.watch<WatchlistCubit>().state;
+          final isInWatchlist = watchlistState.items.any((item) => item.symbol == data.symbol);
+
+          return Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                data.name,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  data.symbol,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                data.quotes.last.close.toStringAsFixed(2),
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: changeColor.withAlpha(25),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${isPositive ? '+' : ''}${change.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: changeColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: changeColor.withAlpha(25),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${isPositive ? '+' : ''}${changePercent.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: changeColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            if (isInWatchlist) {
+                              context.read<WatchlistCubit>().removeFromWatchlist(data.symbol);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${data.name} 已从自选移除'),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            } else {
+                              context.read<WatchlistCubit>().addToWatchlist(data.symbol, data.name);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${data.name} 已添加自选'),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isInWatchlist ? Colors.amber.withAlpha(51) : Colors.grey.withAlpha(25),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isInWatchlist ? Icons.star : Icons.star_border,
+                              color: isInWatchlist ? Colors.amber : Colors.grey,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => context.go('/analysis'),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withAlpha(25),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.analytics_outlined,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
+              ],
+            ),
+          );
+        }
+        return Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Text(
+                AppStrings.appName,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.settings, color: AppColors.textSecondary),
+                onPressed: () => context.go('/settings'),
               ),
             ],
           ),
@@ -185,39 +242,54 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildTabBar() {
-    return BlocBuilder<ChartCubit, ChartState>(
-      buildWhen: (prev, curr) => prev.currentTab != curr.currentTab,
-      builder: (context, chartState) {
-        return SizedBox(
-          height: 48,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _tabNames.length,
-            itemBuilder: (context, index) {
-              final isSelected = chartState.currentTab == index;
-              return GestureDetector(
-                onTap: () => context.read<ChartCubit>().changeTab(index),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _tabNames[index],
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
+  Widget _buildSearchBar() {
+    context.watch<StockBloc>();
+    final storage = context.read<StockBloc>().stockStorage;
+    final history = storage.getSearchHistory();
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: AppStrings.searchHint,
+                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                  prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
-              );
-            },
+                style: const TextStyle(fontSize: 14),
+                onSubmitted: (_) => _searchStock(),
+              ),
+            ),
           ),
-        );
-      },
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _searchStock,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '搜索',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -237,7 +309,9 @@ class _MainPageState extends State<MainPage> {
       },
       builder: (context, state) {
         if (state is StockLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          );
         }
 
         if (state is StockError) {
@@ -247,7 +321,10 @@ class _MainPageState extends State<MainPage> {
               children: [
                 const Icon(Icons.error_outline, color: AppColors.error, size: 48),
                 const SizedBox(height: 8),
-                Text(state.message, style: const TextStyle(color: AppColors.textSecondary)),
+                Text(
+                  state.message,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => context.read<StockBloc>().add(RefreshStock()),
@@ -259,116 +336,145 @@ class _MainPageState extends State<MainPage> {
         }
 
         if (state is StockLoaded) {
-          // Listen to ChartCubit to rebuild chart when tab changes
-          return BlocBuilder<ChartCubit, ChartState>(
-            buildWhen: (prev, curr) => prev.currentTab != curr.currentTab,
-            builder: (context, chartState) => Column(
-              children: [
-                _buildStockInfo(state.stockData),
-                _buildSignalIndicator(state),
-                Expanded(child: _buildChart(state)),
-              ],
-            ),
+          return Column(
+            children: [
+              _buildDateRangeBar(),
+              _buildChartTabs(),
+              _buildIndicatorTabs(),
+              Expanded(child: _buildChart(state)),
+              _buildStockDetails(state),
+            ],
           );
         }
 
-        return const Center(child: Text('搜索股票查看数据'));
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              const Text(
+                AppStrings.pleaseSearchStock,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '输入股票代码搜索，如：000001',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
 
-  Widget _buildStockInfo(StockData data) {
-    final change = data.quotes.length > 1
-        ? data.quotes.last.close - data.quotes[data.quotes.length - 2].close
-        : 0.0;
-    final changePercent = data.quotes.length > 1
-        ? (change / data.quotes[data.quotes.length - 2].close) * 100
-        : 0.0;
-    final isPositive = change >= 0;
-
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text(data.symbol, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+  Widget _buildDateRangeBar() {
+    return BlocBuilder<StockBloc, StockState>(
+      builder: (context, state) {
+        final hasData = state is StockLoaded;
+        return Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
             children: [
-              Text(
-                data.quotes.last.close.toStringAsFixed(2),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                '${isPositive ? '+' : ''}${change.toStringAsFixed(2)} (${changePercent.toStringAsFixed(2)}%)',
-                style: TextStyle(color: isPositive ? AppColors.bullish : AppColors.bearish),
-              ),
+              if (hasData)
+                Text(
+                  '${(state as StockLoaded).startDate} ~ ${state.endDate}',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              const Spacer(),
+              _buildDateChip('1月', 30),
+              _buildDateChip('3月', 90),
+              _buildDateChip('6月', 180),
+              _buildDateChip('1年', 365),
+              _buildDateChip('5年', 1825),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.star_border),
-            tooltip: '添加自选',
-            onPressed: () {
-              context.read<WatchlistCubit>().addToWatchlist(data.symbol, data.name);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${data.name} 已添加到自选'),
-                  duration: const Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            tooltip: '多因子分析',
-            onPressed: () => context.go('/analysis'),
-          ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDateChip(String label, int days) {
+    return GestureDetector(
+      onTap: () {
+        final now = DateTime.now();
+        final start = now.subtract(Duration(days: days));
+        final startStr = '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
+        final endStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        context.read<StockBloc>().add(ChangeDateRange(startStr, endStr));
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        margin: const EdgeInsets.only(left: 6),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
       ),
     );
   }
 
-  Widget _buildSignalIndicator(StockLoaded state) {
-    final chartTab = context.watch<ChartCubit>().state.currentTab;
-    if (chartTab == 1 && state.macdSignal != null) {
-      final signal = state.macdSignal!;
-      final isGolden = signal.signal == MacdSignal.goldenCross;
+  Widget _buildChartTabs() {
+    return Container(
+      color: Colors.white,
+      child: TabBar(
+        controller: _tabController,
+        labelColor: AppColors.primary,
+        unselectedLabelColor: AppColors.textSecondary,
+        indicatorColor: AppColors.primary,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        unselectedLabelStyle: const TextStyle(fontSize: 13),
+        tabs: _tabNames.map((e) => Tab(text: e)).toList(),
+      ),
+    );
+  }
 
-      return Container(
-        padding: const EdgeInsets.all(8),
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: (isGolden ? AppColors.bullish : AppColors.bearish).withAlpha(25),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isGolden ? Icons.trending_up : Icons.trending_down,
-              color: isGolden ? AppColors.bullish : AppColors.bearish,
+  Widget _buildIndicatorTabs() {
+    return BlocBuilder<ChartCubit, ChartState>(
+      builder: (context, chartState) {
+        return Container(
+          color: AppColors.background,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _indicatorTabs.asMap().entries.map((entry) {
+                final isSelected = chartState.currentTab == entry.key;
+                return GestureDetector(
+                  onTap: () => context.read<ChartCubit>().changeTab(entry.key),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    margin: const EdgeInsets.only(left: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : AppColors.border,
+                      ),
+                    ),
+                    child: Text(
+                      entry.value,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
-            const SizedBox(width: 8),
-            Text(
-              isGolden ? AppStrings.goldenCross : AppStrings.deathCross,
-              style: TextStyle(
-                color: isGolden ? AppColors.bullish : AppColors.bearish,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return const SizedBox.shrink();
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildChart(StockLoaded state) {
@@ -388,10 +494,6 @@ class _MainPageState extends State<MainPage> {
         return _buildMaChart(state.maData);
       case 6:
         return _buildWrChart(state.wrData);
-      case 7:
-        return _buildDmiChart(state.dmiData);
-      case 8:
-        return _buildDistributionChart(state.stockData.quotes);
       default:
         return _buildKLineChart(state.stockData.quotes, state.maData);
     }
@@ -399,51 +501,50 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildKLineChart(List<StockQuote> quotes, List<MaData> maData) {
     final displayQuotes = quotes.length > 100 ? quotes.sublist(quotes.length - 100) : quotes;
-    if (displayQuotes.isEmpty) return const Center(child: Text('数据不足'));
+    if (displayQuotes.isEmpty) {
+      return const Center(child: Text('数据不足', style: TextStyle(color: AppColors.textSecondary)));
+    }
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
-        child: CandleChartWidget(
-          quotes: displayQuotes,
-          maData: maData,
-        ),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: CandleChartWidget(
+        quotes: displayQuotes,
+        maData: maData,
       ),
     );
   }
 
-  // Removed duplicate _computeMa method - now uses MaData from StockLoaded state
-
   Widget _buildMacdChart(List<MacdData> data) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
-
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
-                color: AppColors.difColor,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
-                color: AppColors.deaColor,
-              ),
-            ],
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
+              color: AppColors.difColor,
+              isCurved: true,
             ),
-            borderData: FlBorderData(show: false),
-          ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
+              color: AppColors.deaColor,
+              isCurved: true,
+            ),
+          ],
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
@@ -451,32 +552,28 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildRsiChart(List<RsiData> data) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
-
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
-                color: AppColors.primary,
-              ),
-            ],
-            minY: 0,
-            maxY: 100,
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
+              color: AppColors.primary,
+              isCurved: true,
             ),
-            borderData: FlBorderData(show: false),
-          ),
+          ],
+          minY: 0,
+          maxY: 100,
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
@@ -484,38 +581,33 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildKdjChart(List<KdjData> data) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
-
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
-                color: AppColors.kColor,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
-                color: AppColors.dColor,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
-                color: AppColors.jColor,
-              ),
-            ],
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
+              color: AppColors.kColor,
             ),
-            borderData: FlBorderData(show: false),
-          ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
+              color: AppColors.dColor,
+            ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
+              color: AppColors.jColor,
+            ),
+          ],
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
@@ -523,43 +615,38 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildBollChart(List<BollData> data, List<StockQuote> quotes) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
-
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
     final displayQuotes = quotes.sublist(quotes.length - displayData.length);
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
-                color: AppColors.bollUpper,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
-                color: AppColors.bollMiddle,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
-                color: AppColors.bollLower,
-              ),
-              LineChartBarData(
-                spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
-                color: AppColors.textPrimary,
-              ),
-            ],
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
+              color: AppColors.bollUpper,
             ),
-            borderData: FlBorderData(show: false),
-          ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
+              color: AppColors.bollMiddle,
+            ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
+              color: AppColors.bollLower,
+            ),
+            LineChartBarData(
+              spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
+              color: AppColors.textLight,
+            ),
+          ],
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
@@ -567,42 +654,33 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildMaChart(List<MaData> data) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
-
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
-                color: AppColors.ma5Color,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
-                color: AppColors.ma10Color,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
-                color: AppColors.ma20Color,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma60)).toList(),
-                color: AppColors.ma60Color,
-              ),
-            ],
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
+              color: AppColors.ma5Color,
             ),
-            borderData: FlBorderData(show: false),
-          ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
+              color: AppColors.ma10Color,
+            ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
+              color: AppColors.ma20Color,
+            ),
+          ],
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
@@ -610,127 +688,81 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildWrChart(List<WrData> data) {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
-
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
-                color: AppColors.wr6Color,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
-                color: AppColors.wr10Color,
-              ),
-            ],
-            minY: -100,
-            maxY: 0,
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LineChart(
+        LineChartData(
+          lineBarsData: [
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
+              color: AppColors.wr6Color,
             ),
-            borderData: FlBorderData(show: false),
-          ),
+            LineChartBarData(
+              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
+              color: AppColors.wr10Color,
+            ),
+          ],
+          minY: -100,
+          maxY: 0,
+          gridData: FlGridData(show: false),
+          titlesData: FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
         ),
       ),
     );
   }
 
-  Widget _buildDmiChart(List<DmiData> data) {
-    if (data.isEmpty) return const Center(child: Text('数据不足'));
-
-    final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
-
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.pdi)).toList(),
-                color: AppColors.pdiColor,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.mdi)).toList(),
-                color: AppColors.mdiColor,
-              ),
-              LineChartBarData(
-                spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.adx)).toList(),
-                color: AppColors.adxColor,
-              ),
+  Widget _buildStockDetails(StockLoaded state) {
+    final q = state.stockData.quotes.last;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _buildDetailItem('开盘', q.open.toStringAsFixed(2)),
+              _buildDetailItem('最高', q.high.toStringAsFixed(2)),
+              _buildDetailItem('最低', q.low.toStringAsFixed(2)),
+              _buildDetailItem('成交量', _formatVolume(q.volume)),
             ],
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildDistributionChart(List<StockQuote> quotes) {
-    if (quotes.isEmpty) return const Center(child: Text('数据不足'));
+  Widget _buildDetailItem(String label, String value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+          ),
+        ],
+      ),
+    );
+  }
 
-    final prices = quotes.map((q) => q.close).toList();
-    final minPrice = prices.reduce((a, b) => a < b ? a : b);
-    final maxPrice = prices.reduce((a, b) => a > b ? a : b);
-
-    const binCount = 10;
-    final binSize = (maxPrice - minPrice) / binCount;
-    final bins = List.filled(binCount, 0);
-
-    for (final price in prices) {
-      final binIndex = ((price - minPrice) / binSize).toInt().clamp(0, binCount - 1);
-      bins[binIndex]++;
+  String _formatVolume(int volume) {
+    if (volume >= 100000000) {
+      return '${(volume / 100000000).toStringAsFixed(2)}亿';
+    } else if (volume >= 10000) {
+      return '${(volume / 10000).toStringAsFixed(2)}万';
     }
-
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: BarChart(
-          BarChartData(
-            barGroups: bins.asMap().entries.map((e) {
-              return BarChartGroupData(
-                x: e.key,
-                barRods: [
-                  BarChartRodData(
-                    toY: e.value.toDouble(),
-                    color: AppColors.primary,
-                    width: 16,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ],
-              );
-            }).toList(),
-            backgroundColor: AppColors.chartBackground,
-            gridData: FlGridData(show: true, drawVerticalLine: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
-          ),
-        ),
-      ),
-    );
+    return volume.toString();
   }
 
   void _searchStock() {
@@ -739,5 +771,4 @@ class _MainPageState extends State<MainPage> {
       context.read<StockBloc>().add(LoadStock(code));
     }
   }
-
 }
