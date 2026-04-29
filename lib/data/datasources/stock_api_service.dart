@@ -61,7 +61,7 @@ class StockApiService {
       Market.us => '1.$stockCode',
     };
 
-    final url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=$secid&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=0&beg=$beginDate&end=$endDateStr&lmt=500';
+    final url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=$secid&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&beg=$beginDate&end=$endDateStr&lmt=500';
 
     try {
       final response = await _client.get(

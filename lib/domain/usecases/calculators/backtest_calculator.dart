@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter_stock_app/domain/entities/stock_quote.dart';
+import 'package:flutter_stock_app/domain/usecases/calculators/kdj_calculator.dart';
+import 'package:flutter_stock_app/domain/usecases/calculators/rsi_calculator.dart';
 
 enum BacktestStrategy { macd, kdj, rsi, boll, ma, wr, dmi, multi }
 
@@ -40,8 +42,26 @@ class BacktestCalculator {
     for (var i = 30; i < quotes.length; i++) {
       final signal = _getSignal(quotes.sublist(0, i + 1), strategy);
 
+      // 涨跌停限制检查
+      bool canBuy = true;
+      bool canSell = true;
+      if (i > 30) {
+        final prevClose = quotes[i - 1].close;
+        final limitUp = prevClose * 1.10;  // 涨停价（A股10%）
+        final limitDown = prevClose * 0.90;  // 跌停价
+        if (signal != null && signal['isLong'] == true && quotes[i].open >= limitUp) {
+          canBuy = false;  // 涨停，买不入
+        }
+        if (signal != null && signal['isLong'] == false && quotes[i].open <= limitDown) {
+          canBuy = false;  // 跌停，买不入
+        }
+        if (position > 0 && quotes[i].open <= limitDown) {
+          canSell = false;  // 持仓但次日跌停
+        }
+      }
+
       // 入场
-      if (position == 0 && signal != null) {
+      if (position == 0 && signal != null && canBuy) {
         isLong = signal['isLong'] as bool;
         entryPrice = quotes[i].close;
         entryDate = quotes[i].date;
@@ -51,13 +71,17 @@ class BacktestCalculator {
       }
 
       // 出场
-      if (position > 0 && entryDate != null) {
+      if (position > 0 && entryDate != null && canSell) {
         final exitPrice = quotes[i].close;
         final profit = isLong
             ? (exitPrice - entryPrice) * position
             : (entryPrice - exitPrice) * position;
-        final fee = (entryPrice * position + exitPrice * position) * feeRate;
-        final netProfit = profit - fee;
+        // 买入费率 + 卖出费率 + 印花税（卖出时千分之一）
+        final buyFee = entryPrice * position * feeRate;
+        final sellFee = exitPrice * position * feeRate;
+        final stampTax = exitPrice * position * 0.001;  // 印花税仅卖出收取
+        final totalFee = buyFee + sellFee + stampTax;
+        final netProfit = profit - totalFee;
         totalProfit += netProfit;
         capital += netProfit;
 
@@ -71,7 +95,7 @@ class BacktestCalculator {
           profit: netProfit,
           profitPercent: (netProfit / (entryPrice * position)) * 100,
           holdingDays: i - quotes.indexWhere((q) => q.date == entryDate),
-          fee: fee,
+          fee: totalFee,
         ));
 
         if (netProfit > 0) {
@@ -86,10 +110,10 @@ class BacktestCalculator {
         entryDate = null;
       }
 
-      // 更新最大回撤
+      // 更新最大回撤（使用百分比计算）
       if (capital > peakCapital) peakCapital = capital;
-      final drawdown = peakCapital - capital;
-      if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+      final drawdownPercent = peakCapital > 0 ? (peakCapital - capital) / peakCapital * 100 : 0.0;
+      if (drawdownPercent > maxDrawdown) maxDrawdown = drawdownPercent;
     }
 
     final winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
@@ -105,8 +129,8 @@ class BacktestCalculator {
       losingTrades: losingTrades.toInt(),
       winRate: winRate.toDouble(),
       totalProfit: totalProfit.toDouble(),
-      maxDrawdown: maxDrawdown.toDouble(),
-      maxDrawdownPercent: peakCapital > 0 ? maxDrawdown / peakCapital * 100 : 0.0,
+      maxDrawdown: maxDrawdown.toDouble(),  // 已经是百分比
+      maxDrawdownPercent: maxDrawdown.toDouble(),
       sharpeRatio: sharpeRatio.toDouble(),
       kellyPercent: kellyPercent.toDouble(),
       kellyFraction: kellyPercent > 0 ? '${(kellyPercent / 2).toStringAsFixed(1)}%' : '0%',
@@ -141,18 +165,31 @@ class BacktestCalculator {
   }
 
   static Map<String, dynamic>? _macdSignal(List<StockQuote> quotes) {
-    if (quotes.length < 26) return null;
+    if (quotes.length < 35) return null;
 
     final closes = quotes.map((q) => q.close).toList();
     final ema12 = _ema(closes, 12);
     final ema26 = _ema(closes, 26);
 
-    if (quotes.length < 35) return null;
+    // EMA12从索引12开始，EMA26从索引26开始
+    // DIF = EMA12 - EMA26，需要对齐到同一个时间点
+    // EMA12比EMA26多14个元素（26-12=14），所以从EMA12[14]开始减EMA26[0]
+    if (ema12.length < 15 || ema26.length < 2) return null;
 
-    final dif1 = ema12[ema12.length - 2];
-    final dea1 = ema26[ema26.length - 2];
-    final dif2 = ema12[ema12.length - 1];
-    final dea2 = ema26[ema26.length - 1];
+    // 计算最近几天的DIF
+    final difValues = <double>[];
+    final startIdx = ema12.length - ema26.length;
+    for (var i = 0; i < ema26.length; i++) {
+      difValues.add(ema12[startIdx + i] - ema26[i]);
+    }
+
+    if (difValues.length < 3) return null;
+
+    // DIF上穿DEA（金叉）
+    final dif1 = difValues[difValues.length - 2];
+    final dif2 = difValues[difValues.length - 1];
+    final dea1 = _ema(difValues, 9)[difValues.length - 2];
+    final dea2 = _ema(difValues, 9)[difValues.length - 1];
 
     if (dif1 <= dea1 && dif2 > dea2) return {'isLong': true};
     if (dif1 >= dea1 && dif2 < dea2) return {'isLong': false};
@@ -162,43 +199,45 @@ class BacktestCalculator {
   static Map<String, dynamic>? _kdjSignal(List<StockQuote> quotes) {
     if (quotes.length < 9) return null;
 
-    double highestHigh = quotes[quotes.length - 9].high;
-    double lowestLow = quotes[quotes.length - 9].low;
-    for (var i = quotes.length - 9; i < quotes.length; i++) {
-      if (quotes[i].high > highestHigh) highestHigh = quotes[i].high;
-      if (quotes[i].low < lowestLow) lowestLow = quotes[i].low;
+    // 使用专业的KDJ计算器
+    final kdjData = KdjCalculator.calculate(quotes);
+    if (kdjData.length < 2) return null;
+
+    final current = kdjData.last;
+    final prev = kdjData[kdjData.length - 2];
+
+    // K值从下往上穿越D值，且都在超卖区
+    if (prev.k < prev.d && current.k > current.d && current.k < 20 && current.d < 20) {
+      return {'isLong': true};
     }
-
-    final rsv = highestHigh == lowestLow ? 50 : (quotes.last.close - lowestLow) / (highestHigh - lowestLow) * 100;
-    final k = 2 / 3 * 50 + 1 / 3 * rsv;
-    final d = 2 / 3 * 50 + 1 / 3 * k;
-
-    if (k < 20 && d < 20 && k > d) return {'isLong': true};
-    if (k > 80 && d > 80 && k < d) return {'isLong': false};
+    // K值从上往下穿越D值，且都在超买区
+    if (prev.k > prev.d && current.k < current.d && current.k > 80 && current.d > 80) {
+      return {'isLong': false};
+    }
     return null;
   }
 
   static Map<String, dynamic>? _rsiSignal(List<StockQuote> quotes) {
     if (quotes.length < 15) return null;
 
-    double avgGain = 0, avgLoss = 0;
-    for (var i = quotes.length - 14; i < quotes.length; i++) {
-      final change = quotes[i].close - quotes[i - 1].close;
-      if (change > 0) avgGain += change;
-      else avgLoss += change.abs();
-    }
-    avgGain /= 14;
-    avgLoss /= 14;
-    final rsi = avgLoss == 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+    // 使用专业的RSI计算器（Wilder平滑法）
+    final rsiData = RsiCalculator.calculate(quotes);
+    if (rsiData.length < 2) return null;
 
-    if (rsi < 30) return {'isLong': true};
-    if (rsi > 70) return {'isLong': false};
+    final current = rsiData.last.rsi;
+    final prev = rsiData[rsiData.length - 2].rsi;
+
+    // RSI从超卖区上穿
+    if (prev < 30 && current >= 30) return {'isLong': true};
+    // RSI从超买区下穿
+    if (prev > 70 && current <= 70) return {'isLong': false};
     return null;
   }
 
   static Map<String, dynamic>? _bollSignal(List<StockQuote> quotes) {
-    if (quotes.length < 20) return null;
+    if (quotes.length < 21) return null;
 
+    // 使用20日布林带
     final closes = quotes.sublist(quotes.length - 20).map((q) => q.close).toList();
     final middle = closes.reduce((a, b) => a + b) / 20;
 
@@ -206,21 +245,25 @@ class BacktestCalculator {
     for (final c in closes) {
       variance += pow(c - middle, 2);
     }
-    variance /= 19;
+    variance /= 19;  // BOLL用N-1做样本方差
     final stdDev = sqrt(variance);
 
     final upper = middle + 2 * stdDev;
     final lower = middle - 2 * stdDev;
     final currentPrice = quotes.last.close;
+    final prevPrice = quotes[quotes.length - 2].close;
 
-    if (currentPrice < lower) return {'isLong': true};
-    if (currentPrice > upper) return {'isLong': false};
+    // 价格从下轨下方向上突破下轨买入
+    if (prevPrice < lower && currentPrice >= lower) return {'isLong': true};
+    // 价格从上轨上方，向下跌破上轨卖出
+    if (prevPrice > upper && currentPrice <= upper) return {'isLong': false};
     return null;
   }
 
   static Map<String, dynamic>? _maSignal(List<StockQuote> quotes) {
-    if (quotes.length < 20) return null;
+    if (quotes.length < 21) return null;
 
+    // 计算MA5, MA10, MA20
     double ma5 = 0, ma10 = 0, ma20 = 0;
     for (var i = 0; i < 5; i++) ma5 += quotes[quotes.length - 1 - i].close;
     for (var i = 0; i < 10; i++) ma10 += quotes[quotes.length - 1 - i].close;
@@ -229,14 +272,26 @@ class BacktestCalculator {
     ma10 /= 10;
     ma20 /= 20;
 
-    if (ma5 > ma10 && ma10 > ma20) return {'isLong': true};
-    if (ma5 < ma10 && ma10 < ma20) return {'isLong': false};
+    // 上一根K线的均线状态
+    double prevMa5 = 0, prevMa10 = 0, prevMa20 = 0;
+    for (var i = 1; i <= 5; i++) prevMa5 += quotes[quotes.length - 2 - i].close;
+    for (var i = 1; i <= 10; i++) prevMa10 += quotes[quotes.length - 2 - i].close;
+    for (var i = 1; i <= 20; i++) prevMa20 += quotes[quotes.length - 2 - i].close;
+    prevMa5 /= 5;
+    prevMa10 /= 10;
+    prevMa20 /= 20;
+
+    // 空头排列转多头排列（金叉买入）
+    if (prevMa5 <= prevMa10 && ma5 > ma10 && ma10 > ma20 && prevMa20 > prevMa10) return {'isLong': true};
+    // 多头排列转空头排列（死叉卖出）
+    if (prevMa5 >= prevMa10 && ma5 < ma10 && ma10 < ma20 && prevMa20 < prevMa10) return {'isLong': false};
     return null;
   }
 
   static Map<String, dynamic>? _wrSignal(List<StockQuote> quotes) {
     if (quotes.length < 10) return null;
 
+    // WR威廉指标，10日周期
     double highestHigh = quotes[quotes.length - 10].high;
     double lowestLow = quotes[quotes.length - 10].low;
     for (var i = quotes.length - 10; i < quotes.length; i++) {
@@ -245,10 +300,24 @@ class BacktestCalculator {
     }
 
     final wr = highestHigh == lowestLow ? 50 : (highestHigh - quotes.last.close) / (highestHigh - lowestLow) * 100;
+    final prevWr = _calcWrSingle(quotes.sublist(0, quotes.length - 1), 10);
 
-    if (wr > 80) return {'isLong': true};
-    if (wr < 20) return {'isLong': false};
+    // WR从80以上向上突破（超卖区上穿）
+    if (prevWr <= 80 && wr > 80) return {'isLong': true};
+    // WR从20以下向下突破（超买区下穿）
+    if (prevWr >= 20 && wr < 20) return {'isLong': false};
     return null;
+  }
+
+  static double _calcWrSingle(List<StockQuote> quotes, int period) {
+    if (quotes.length < period) return 50;
+    double highestHigh = quotes[quotes.length - period].high;
+    double lowestLow = quotes[quotes.length - period].low;
+    for (var i = quotes.length - period; i < quotes.length; i++) {
+      if (quotes[i].high > highestHigh) highestHigh = quotes[i].high;
+      if (quotes[i].low < lowestLow) lowestLow = quotes[i].low;
+    }
+    return highestHigh == lowestLow ? 50 : (highestHigh - quotes.last.close) / (highestHigh - lowestLow) * 100;
   }
 
   static Map<String, dynamic>? _dmiSignal(List<StockQuote> quotes) {
