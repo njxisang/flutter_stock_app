@@ -85,8 +85,6 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
         final bottomPadding = h > 300 ? 40.0 : 30.0;
         final volumeHeight = h > 300 ? 50.0 : 35.0;
 
-        final alignedMa = _getAlignedMa();
-
         return GestureDetector(
           onScaleUpdate: (details) {
             setState(() {
