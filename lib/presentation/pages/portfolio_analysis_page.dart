@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math';
 import '../../domain/entities/stock_quote.dart';
+import '../../data/datasources/stock_api_service.dart';
 import '../blocs/watchlist/watchlist_cubit.dart';
 
 class PortfolioAnalysisPage extends StatefulWidget {
@@ -406,19 +407,23 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
 
   Future<void> _loadAllStockData(BuildContext context, WatchlistState state) async {
     setState(() => _loading = true);
-    final bloc = context.read<WatchlistCubit>();
+    final apiService = StockApiService();
+    final Map<String, StockData> loaded = {};
 
-    // Access StockApiService through bloc - need to get it from context
-    // We'll use a simple approach: load each stock's data
-    // Since we don't have direct API access here, use default quotes for display
-    // The actual API call should be done through StockBloc
-
-    // For now, show loading state and compute from available data
-    // In a real implementation, you'd iterate and call apiService
-    await Future.delayed(const Duration(seconds: 1));
+    for (final item in state.items) {
+      try {
+        final data = await apiService.getStockData(item.symbol);
+        loaded[item.symbol] = data;
+      } catch (e) {
+        // skip failed stocks silently
+      }
+    }
 
     if (mounted) {
-      setState(() => _loading = false);
+      setState(() {
+        _stockDataMap = loaded;
+        _loading = false;
+      });
     }
   }
 }
