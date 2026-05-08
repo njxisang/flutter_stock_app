@@ -109,6 +109,19 @@ class StockBloc extends Bloc<StockEvent, StockState> {
     on<ChangeDateRange>(_onChangeDateRange);
   }
 
+  /// 从Settings读取指标周期参数（Fix #1: 统一参数来源）
+  Map<String, dynamic> get _indicatorParams {
+    final settings = storage.getSettings();
+    return {
+      'shortPeriod':  settings['shortPeriod'] ?? 12,
+      'longPeriod':   settings['longPeriod']  ?? 26,
+      'signalPeriod': settings['signalPeriod'] ?? 9,
+      'rsiPeriod':    settings['rsiPeriod']   ?? 6,
+      'kdjPeriod':    settings['kdjPeriod']   ?? 9,
+      'bollPeriod':   settings['bollPeriod']  ?? 20,
+    };
+  }
+
   Future<void> _onLoadStock(LoadStock event, Emitter<StockState> emit) async {
     emit(StockLoading());
     _currentSymbol = event.symbol;
@@ -128,10 +141,27 @@ class StockBloc extends Bloc<StockEvent, StockState> {
         return;
       }
 
-      final macdData = MacdCalculator.calculate(stockData.quotes);
-      final rsiData = RsiCalculator.calculate(stockData.quotes);
-      final kdjData = KdjCalculator.calculate(stockData.quotes);
-      final bollData = BollCalculator.calculate(stockData.quotes);
+      // Fix #1: 从Settings读取参数，而非硬编码默认值
+      final params = _indicatorParams;
+
+      final macdData = MacdCalculator.calculate(
+        stockData.quotes,
+        shortPeriod: params['shortPeriod'] as int,
+        longPeriod: params['longPeriod'] as int,
+        signalPeriod: params['signalPeriod'] as int,
+      );
+      final rsiData = RsiCalculator.calculate(
+        stockData.quotes,
+        period: params['rsiPeriod'] as int,
+      );
+      final kdjData = KdjCalculator.calculate(
+        stockData.quotes,
+        period: params['kdjPeriod'] as int,
+      );
+      final bollData = BollCalculator.calculate(
+        stockData.quotes,
+        period: params['bollPeriod'] as int,
+      );
       final maData = MaCalculator.calculate(stockData.quotes);
       final wrData = WrCalculator.calculate(stockData.quotes);
       final dmiData = DmiCalculator.calculate(stockData.quotes);

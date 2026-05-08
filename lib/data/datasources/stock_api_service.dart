@@ -1,13 +1,55 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import '../../domain/entities/stock_quote.dart';
 
 enum Market { sh, sz, bj, us }
 
+class _CacheEntry {
+  final String body;
+  final Map<String, String> headers;
+  final DateTime timestamp;
+  final String apiSource;
+
+  _CacheEntry({
+    required this.body,
+    required this.headers,
+    required this.timestamp,
+    required this.apiSource,
+  });
+
+  bool get isExpired => DateTime.now().difference(timestamp).inMinutes >= 5;
+}
+
 class StockApiService {
   final http.Client _client;
+  final Map<String, _CacheEntry> _cache = {};
 
   StockApiService({http.Client? client}) : _client = client ?? http.Client();
+
+  String _cacheKey(String url) => md5.convert(utf8.encode(url)).toString();
+
+  _CacheEntry? _getCachedResponse(String url) {
+    final key = _cacheKey(url);
+    final entry = _cache[key];
+    if (entry != null && !entry.isExpired) {
+      print('[Cache HIT] URL: $url (API: ${entry.apiSource})');
+      return entry;
+    }
+    print('[Cache MISS] URL: $url');
+    return null;
+  }
+
+  void _cacheResponse(String url, String body, Map<String, String> headers, String apiSource) {
+    final key = _cacheKey(url);
+    _cache[key] = _CacheEntry(
+      body: body,
+      headers: headers,
+      timestamp: DateTime.now(),
+      apiSource: apiSource,
+    );
+    print('[Cache STORED] URL: $url (API: $apiSource)');
+  }
 
   Market detectMarket(String symbol) {
     final upper = symbol.toUpperCase();
@@ -63,7 +105,14 @@ class StockApiService {
 
     final url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=$secid&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&beg=$beginDate&end=$endDateStr&lmt=500';
 
+    // Check cache first
+    final cached = _getCachedResponse(url);
+    if (cached != null) {
+      return _parseCNStockResponse(cached.body, normalized, stockName);
+    }
+
     try {
+      print('[API CALL] EastMoney Primary API: $url');
       final response = await _client.get(
         Uri.parse(url),
         headers: {
@@ -73,6 +122,7 @@ class StockApiService {
       );
 
       if (response.statusCode == 200) {
+        _cacheResponse(url, response.body, response.headers, 'EastMoney Primary');
         final json = jsonDecode(response.body);
         final data = json['data'] as Map<String, dynamic>?;
         final klines = data?['klines'] as List<dynamic>?;
@@ -98,11 +148,39 @@ class StockApiService {
         }
       }
     } catch (e) {
+      print('[API DEGRADATION] EastMoney Primary API failed: $e');
       // Fall through to backup APIs
     }
 
     // Try Tencent backup API
     return _getTencentBackupData(symbol, market, stockName, startDate, endDate);
+  }
+
+  Future<StockData> _parseCNStockResponse(String body, String normalized, String stockName) async {
+    final json = jsonDecode(body);
+    final data = json['data'] as Map<String, dynamic>?;
+    final klines = data?['klines'] as List<dynamic>?;
+
+    if (klines != null && klines.isNotEmpty) {
+      final quotes = <StockQuote>[];
+      for (final item in klines) {
+        final parts = item.toString().split(',');
+        if (parts.length >= 6) {
+          quotes.add(StockQuote(
+            date: parts[0],
+            open: double.tryParse(parts[1]) ?? 0.0,
+            high: double.tryParse(parts[3]) ?? 0.0,
+            low: double.tryParse(parts[4]) ?? 0.0,
+            close: double.tryParse(parts[2]) ?? 0.0,
+            volume: int.tryParse(parts[5]) ?? 0,
+          ));
+        }
+      }
+      if (quotes.isNotEmpty) {
+        return StockData(symbol: normalized, name: stockName, quotes: quotes);
+      }
+    }
+    throw Exception('无法解析股票数据');
   }
 
   Future<StockData> _getTencentBackupData(String symbol, Market market, String stockName, String startDate, String endDate) async {
@@ -112,13 +190,21 @@ class StockApiService {
 
     final url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?var=&param=${marketCode}$stockCode,day,,,320,qfq';
 
+    // Check cache first
+    final cached = _getCachedResponse(url);
+    if (cached != null) {
+      return _parseTencentBackupResponse(cached.body, normalized, stockName);
+    }
+
     try {
+      print('[API CALL] Tencent Backup API: $url');
       final response = await _client.get(
         Uri.parse(url),
         headers: {'User-Agent': 'Mozilla/5.0'},
       );
 
       if (response.statusCode == 200) {
+        _cacheResponse(url, response.body, response.headers, 'Tencent Backup');
         final json = jsonDecode(response.body);
         final data = json['data']?[ '${marketCode}$stockCode'] as Map<String, dynamic>?;
         final qfqday = data?['qfqday'] as List<dynamic>?;
@@ -143,10 +229,38 @@ class StockApiService {
         }
       }
     } catch (e) {
+      print('[API DEGRADATION] Tencent Backup API failed: $e');
       // Fall through to error
     }
 
     throw Exception('无法获取股票数据');
+  }
+
+  Future<StockData> _parseTencentBackupResponse(String body, String normalized, String stockName) async {
+    final json = jsonDecode(body);
+    final normalizedLower = normalized.toLowerCase();
+    final data = json['data']?[normalizedLower] as Map<String, dynamic>?;
+    final qfqday = data?['qfqday'] as List<dynamic>?;
+
+    if (qfqday != null && qfqday.isNotEmpty) {
+      final quotes = <StockQuote>[];
+      for (final item in qfqday) {
+        if (item is List && item.length >= 6) {
+          quotes.add(StockQuote(
+            date: item[0].toString(),
+            open: (item[1] as num).toDouble(),
+            high: (item[2] as num).toDouble(),
+            low: (item[3] as num).toDouble(),
+            close: (item[4] as num).toDouble(),
+            volume: (item[5] as num).toInt(),
+          ));
+        }
+      }
+      if (quotes.isNotEmpty) {
+        return StockData(symbol: normalized, name: stockName, quotes: quotes);
+      }
+    }
+    throw Exception('无法解析备份API数据');
   }
 
   Future<String> _getStockName(String stockCode, Market market) async {
@@ -155,6 +269,21 @@ class StockApiService {
     for (final type in types) {
       try {
         final url = 'https://searchapi.eastmoney.com/api/suggest/get?input=$stockCode&type=$type&count=1';
+        
+        // Check cache first
+        final cached = _getCachedResponse(url);
+        if (cached != null) {
+          final json = jsonDecode(cached.body);
+          final QuotationCode = json['QuotationCode'] as List<dynamic>?;
+          if (QuotationCode != null && QuotationCode.isNotEmpty) {
+            final name = QuotationCode[0]['Name'] as String?;
+            if (name != null && name.isNotEmpty) {
+              return name;
+            }
+          }
+          continue;
+        }
+
         final response = await _client.get(
           Uri.parse(url),
           headers: {
@@ -164,6 +293,7 @@ class StockApiService {
         );
 
         if (response.statusCode == 200) {
+          _cacheResponse(url, response.body, response.headers, 'EastMoney StockName');
           final json = jsonDecode(response.body);
           final QuotationCode = json['QuotationCode'] as List<dynamic>?;
           if (QuotationCode != null && QuotationCode.isNotEmpty) {
@@ -189,13 +319,21 @@ class StockApiService {
   Future<StockData> _getUSStockData(String symbol, String startDate, String endDate) async {
     final url = 'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?interval=1d&range=6mo';
 
+    // Check cache first
+    final cached = _getCachedResponse(url);
+    if (cached != null) {
+      return _parseUSStockResponse(cached.body, symbol);
+    }
+
     try {
+      print('[API CALL] Yahoo Finance API: $url');
       final response = await _client.get(
         Uri.parse(url),
         headers: {'User-Agent': 'Mozilla/5.0'},
       );
 
       if (response.statusCode == 200) {
+        _cacheResponse(url, response.body, response.headers, 'Yahoo Finance');
         final json = jsonDecode(response.body);
         final chart = json['chart'] as Map<String, dynamic>?;
         final result = (chart?['result'] as List<dynamic>?)?.firstOrNull as Map<String, dynamic>?;
@@ -235,10 +373,52 @@ class StockApiService {
         }
       }
     } catch (e) {
+      print('[API DEGRADATION] Yahoo Finance API failed: $e');
       throw Exception('无法获取美股数据: $e');
     }
 
     throw Exception('无法获取股票数据');
+  }
+
+  Future<StockData> _parseUSStockResponse(String body, String symbol) async {
+    final json = jsonDecode(body);
+    final chart = json['chart'] as Map<String, dynamic>?;
+    final result = (chart?['result'] as List<dynamic>?)?.firstOrNull as Map<String, dynamic>?;
+    final meta = result?['meta'] as Map<String, dynamic>?;
+    final symbolName = meta?['shortName'] ?? symbol;
+
+    final indicators = result?['indicators'] as Map<String, dynamic>?;
+    final quote = (indicators?['quote'] as List<dynamic>?)?.firstOrNull as Map<String, dynamic>?;
+    final closeArr = quote?['close'] as List<dynamic>?;
+    final openArr = quote?['open'] as List<dynamic>?;
+    final highArr = quote?['high'] as List<dynamic>?;
+    final lowArr = quote?['low'] as List<dynamic>?;
+    final volumeArr = quote?['volume'] as List<dynamic>?;
+    final timestamps = result?['timestamp'] as List<dynamic>?;
+
+    if (timestamps != null && closeArr != null) {
+      final quotes = <StockQuote>[];
+      for (var i = 0; i < timestamps.length; i++) {
+        final ts = timestamps[i] as int;
+        final date = DateTime.fromMillisecondsSinceEpoch(ts * 1000);
+        final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        final closeVal = (closeArr[i] as num?)?.toDouble() ?? 0.0;
+        if (closeVal > 0) {
+          quotes.add(StockQuote(
+            date: dateStr,
+            open: (openArr?[i] as num?)?.toDouble() ?? closeVal,
+            high: (highArr?[i] as num?)?.toDouble() ?? closeVal,
+            low: (lowArr?[i] as num?)?.toDouble() ?? closeVal,
+            close: closeVal,
+            volume: (volumeArr?[i] as num?)?.toInt() ?? 0,
+          ));
+        }
+      }
+      if (quotes.isNotEmpty) {
+        return StockData(symbol: symbol, name: symbolName.toString(), quotes: quotes);
+      }
+    }
+    throw Exception('无法解析美股数据');
   }
 
   // ============ 龙虎榜 ============

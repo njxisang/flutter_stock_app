@@ -124,32 +124,69 @@ class SettingsPage extends StatelessWidget {
               _SettingsTile(
                 title: AppStrings.clearSearchHistory,
                 trailing: const Icon(Icons.delete_outline, size: 20),
-                onTap: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('确认清除'),
-                      content: const Text('将清除所有搜索历史'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('清除')),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true && context.mounted) {
-                    await context.read<SettingsCubit>().clearSearchHistory();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('搜索历史已清除')),
-                      );
-                    }
-                  }
-                },
+                onTap: () => _showClearHistoryConfirmation(context),
               ),
               const SizedBox(height: 32),
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _showClearHistoryConfirmation(BuildContext context) {
+    final controller = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('清除搜索历史', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            const Text('为确认清除，请在下方输入"清除"', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: '输入"清除"',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      if (controller.text == '清除') {
+                        Navigator.pop(ctx);
+                        await context.read<SettingsCubit>().clearSearchHistory();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('搜索历史已清除')),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('确认'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
