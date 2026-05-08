@@ -99,6 +99,8 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   String _currentSymbol = '';
   String _startDate = '';
   String _endDate = '';
+  String _computedParamsHash = '';
+  String _computedDataHash = '';
 
   StockBloc({
     required this.apiService,
@@ -122,6 +124,20 @@ class StockBloc extends Bloc<StockEvent, StockState> {
     };
   }
 
+  /// 计算参数Hash，用于检测参数是否变化
+  String _computeParamsHash(Map<String, dynamic> params) {
+    return '${params['shortPeriod']}_${params['longPeriod']}_${params['signalPeriod']}_'
+           '${params['rsiPeriod']}_${params['kdjPeriod']}_${params['bollPeriod']}';
+  }
+
+  /// 计算数据Hash，用于检测数据是否变化
+  String _computeDataHash(StockData stockData) {
+    // 使用数据长度 + 最后一条数据的时间戳作为hash
+    if (stockData.quotes.isEmpty) return '';
+    final lastQuote = stockData.quotes.last;
+    return '${stockData.quotes.length}_${lastQuote.date}';
+  }
+
   Future<void> _onLoadStock(LoadStock event, Emitter<StockState> emit) async {
     emit(StockLoading());
     _currentSymbol = event.symbol;
@@ -141,30 +157,54 @@ class StockBloc extends Bloc<StockEvent, StockState> {
         return;
       }
 
-      // Fix #1: 从Settings读取参数，而非硬编码默认值
+      // Fix #2: 从Settings读取参数，而非硬编码默认值
       final params = _indicatorParams;
+      final paramsHash = _computeParamsHash(params);
+      final dataHash = _computeDataHash(stockData);
 
-      final macdData = MacdCalculator.calculate(
-        stockData.quotes,
-        shortPeriod: params['shortPeriod'] as int,
-        longPeriod: params['longPeriod'] as int,
-        signalPeriod: params['signalPeriod'] as int,
-      );
-      final rsiData = RsiCalculator.calculate(
-        stockData.quotes,
-        period: params['rsiPeriod'] as int,
-      );
-      final kdjData = KdjCalculator.calculate(
-        stockData.quotes,
-        period: params['kdjPeriod'] as int,
-      );
-      final bollData = BollCalculator.calculate(
-        stockData.quotes,
-        period: params['bollPeriod'] as int,
-      );
-      final maData = MaCalculator.calculate(stockData.quotes);
-      final wrData = WrCalculator.calculate(stockData.quotes);
-      final dmiData = DmiCalculator.calculate(stockData.quotes);
+      // Fix #2: 检测参数和数据是否变化，如无变化则跳过指标计算
+      final combinedHash = '${event.symbol}_${dataHash}_$paramsHash';
+      if (combinedHash == _computedParamsHash && state is StockLoaded) {
+        // 数据和参数未变化，保留当前状态
+        return;
+      }
+      _computedParamsHash = combinedHash;
+      _computedDataHash = dataHash;
+
+      // Fix #2: 使用Future.wait()并行计算所有指标（除MACD信号检测外，因为它依赖macdData）
+      final results = await Future.wait([
+        Future(() => MacdCalculator.calculate(
+          stockData.quotes,
+          shortPeriod: params['shortPeriod'] as int,
+          longPeriod: params['longPeriod'] as int,
+          signalPeriod: params['signalPeriod'] as int,
+        )),
+        Future(() => RsiCalculator.calculate(
+          stockData.quotes,
+          period: params['rsiPeriod'] as int,
+        )),
+        Future(() => KdjCalculator.calculate(
+          stockData.quotes,
+          period: params['kdjPeriod'] as int,
+        )),
+        Future(() => BollCalculator.calculate(
+          stockData.quotes,
+          period: params['bollPeriod'] as int,
+        )),
+        Future(() => MaCalculator.calculate(stockData.quotes)),
+        Future(() => WrCalculator.calculate(stockData.quotes)),
+        Future(() => DmiCalculator.calculate(stockData.quotes)),
+      ]);
+
+      final macdData = results[0] as List<MacdData>;
+      final rsiData = results[1] as List<RsiData>;
+      final kdjData = results[2] as List<KdjData>;
+      final bollData = results[3] as List<BollData>;
+      final maData = results[4] as List<MaData>;
+      final wrData = results[5] as List<WrData>;
+      final dmiData = results[6] as List<DmiData>;
+
+      // MACD信号检测必须在macdData计算完成后进行（顺序依赖）
       final macdSignal = MacdCalculator.detectSignal(macdData);
 
       emit(StockLoaded(

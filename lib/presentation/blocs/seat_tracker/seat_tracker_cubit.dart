@@ -1,8 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/datasources/seat_history_service.dart';
-import '../../../data/datasources/stock_api_service.dart';
-import '../../../domain/entities/stock_quote.dart';
+import '../../../data/datasources/lhb_api_service.dart';
 
 // ============ State ============
 
@@ -53,13 +52,13 @@ class SeatTrackerState extends Equatable {
 
 class SeatTrackerCubit extends Cubit<SeatTrackerState> {
   final SeatHistoryService _historyService;
-  final StockApiService _apiService;
+  final LhbApiService _lhbApiService;
 
   SeatTrackerCubit({
     required SeatHistoryService historyService,
-    required StockApiService apiService,
+    required LhbApiService lhbApiService,
   })  : _historyService = historyService,
-        _apiService = apiService,
+        _lhbApiService = lhbApiService,
         super(const SeatTrackerState());
 
   /// 初始化：加载追踪席位列表
@@ -78,7 +77,7 @@ class SeatTrackerCubit extends Cubit<SeatTrackerState> {
 
     try {
       final today = _todayStr();
-      final entries = await _apiService.getLhbData(date: today);
+      final entries = await _lhbApiService.getLhbData(date: today);
 
       if (entries.isNotEmpty) {
         // 批量写入存储

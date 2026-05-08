@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_constants.dart';
-import '../../data/datasources/stock_api_service.dart';
+import '../../data/datasources/lhb_api_service.dart';
+import '../../data/datasources/fund_flow_api_service.dart';
 import '../../data/datasources/seat_history_service.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/seat_tracker/seat_tracker_cubit.dart';
@@ -20,7 +21,8 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
   late TabController _tabController;
   final _searchController = TextEditingController();
   final _seatSearchController = TextEditingController();
-  final _api = StockApiService();
+  final _lhbApi = LhbApiService();
+  final _fundFlowApi = FundFlowApiService();
 
   // 龙虎榜数据
   List<LhbEntry> _lhbList = [];
@@ -57,7 +59,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
     });
 
     try {
-      final list = await _api.getLhbData(date: _lhbDate);
+      final list = await _lhbApi.getLhbData(date: _lhbDate);
       if (mounted) {
         setState(() {
           _lhbList = list;
@@ -79,8 +81,8 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
     });
 
     try {
-      final data = await _api.getStockFundFlow(symbol);
-      final realtime = await _api.getFundFlowRealtime(symbol);
+      final data = await _fundFlowApi.getStockFundFlow(symbol);
+      final realtime = await _fundFlowApi.getFundFlowRealtime(symbol);
       if (mounted) {
         setState(() {
           _moneyFlowData = data;
@@ -103,7 +105,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
     return BlocProvider(
       create: (_) => SeatTrackerCubit(
         historyService: context.read<SeatHistoryService>(),
-        apiService: _api,
+        lhbApiService: _lhbApi,
       )..loadSeats(),
       child: Scaffold(
         backgroundColor: AppColors.background,

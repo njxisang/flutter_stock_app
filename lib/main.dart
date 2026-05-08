@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/constants/app_constants.dart';
 import 'core/router/app_router.dart';
 import 'data/datasources/stock_api_service.dart';
+import 'data/datasources/lhb_api_service.dart';
+import 'data/datasources/fund_flow_api_service.dart';
 import 'data/datasources/stock_local_storage.dart';
 import 'data/datasources/seat_history_service.dart';
 import 'presentation/blocs/stock/stock_bloc.dart';
@@ -17,11 +19,15 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final storage = StockLocalStorage(prefs);
   final apiService = StockApiService();
+  final lhbApiService = LhbApiService();
+  final fundFlowApiService = FundFlowApiService();
   final seatHistoryService = SeatHistoryService(prefs);
 
   runApp(MyApp(
     storage: storage,
     apiService: apiService,
+    lhbApiService: lhbApiService,
+    fundFlowApiService: fundFlowApiService,
     seatHistoryService: seatHistoryService,
   ));
 }
@@ -29,12 +35,16 @@ void main() async {
 class MyApp extends StatelessWidget {
   final StockLocalStorage storage;
   final StockApiService apiService;
+  final LhbApiService lhbApiService;
+  final FundFlowApiService fundFlowApiService;
   final SeatHistoryService seatHistoryService;
 
   const MyApp({
     super.key,
     required this.storage,
     required this.apiService,
+    required this.lhbApiService,
+    required this.fundFlowApiService,
     required this.seatHistoryService,
   });
 
@@ -57,7 +67,7 @@ class MyApp extends StatelessWidget {
         BlocProvider<SeatTrackerCubit>(
           create: (_) => SeatTrackerCubit(
             historyService: seatHistoryService,
-            apiService: apiService,
+            lhbApiService: lhbApiService,
           )..loadSeats(),
         ),
       ],
