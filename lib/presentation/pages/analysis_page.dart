@@ -41,9 +41,9 @@ class _AnalysisPageState extends State<AnalysisPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.analytics_outlined, size: 64, color: Colors.grey),
+                  const Icon(Icons.analytics_outlined, size: 64, color: AppColors.textTertiary),
                   const SizedBox(height: 16),
-                  const Text('请先加载股票数据', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('请先加载股票数据', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -73,7 +73,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(state.stockData.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              Text(state.stockData.symbol, style: const TextStyle(color: Colors.grey)),
+                              Text(state.stockData.symbol, style: const TextStyle(color: AppColors.textSecondary)),
                               const SizedBox(height: 4),
                               Text('最新价: ${last.close.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14)),
                             ],
@@ -172,9 +172,9 @@ class _AnalysisPageState extends State<AnalysisPage> {
   }
 
   Widget _buildFactorCard(FactorResult f) {
-    final scoreColor = f.score > 0 ? Colors.green : f.score < 0 ? Colors.red : Colors.grey;
+    final scoreColor = f.score > 0 ? AppColors.success : f.score < 0 ? AppColors.error : AppColors.textTertiary;
     final statusText = f.score > 0 ? '利好' : f.score < 0 ? '利空' : '中性';
-    final statusColor = f.score > 0 ? Colors.green : f.score < 0 ? Colors.red : Colors.grey;
+    final statusColor = f.score > 0 ? AppColors.success : f.score < 0 ? AppColors.error : AppColors.textTertiary;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -242,7 +242,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
   Widget _buildPriceInfo(String label, double price, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         Text(price.toStringAsFixed(2), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
       ],

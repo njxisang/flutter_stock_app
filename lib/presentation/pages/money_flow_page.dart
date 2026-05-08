@@ -108,7 +108,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           elevation: 0,
           title: const Text('资金与龙虎榜', style: TextStyle(color: AppColors.textPrimary, fontSize: 17)),
           actions: [
@@ -130,8 +130,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      color: Colors.white,
+    return Container(color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Row(
         children: [
@@ -174,8 +173,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
   }
 
   Widget _buildTabBar() {
-    return Container(
-      color: Colors.white,
+    return Container(color: AppColors.surface,
       child: TabBar(
         controller: _tabController,
         labelColor: AppColors.primary,
@@ -243,8 +241,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
             child: Container(
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(color: AppColors.cardBackground,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.border.withAlpha(77)),
               ),
@@ -317,13 +314,12 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
         maxChildSize: 0.9,
         minChildSize: 0.3,
         builder: (_, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: const BoxDecoration(color: AppColors.cardBackground,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Column(
             children: [
-              Container(margin: const EdgeInsets.only(top: 12), width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+              Container(margin: const EdgeInsets.only(top: 12), width: 36, height: 4, decoration: BoxDecoration(color: AppColors.textTertiary, borderRadius: BorderRadius.circular(2))),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -410,8 +406,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
           // 实时大单指标卡
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(color: AppColors.cardBackground,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border.withAlpha(77)),
             ),
@@ -458,8 +453,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
           // 最近10日明细
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(color: AppColors.cardBackground,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border.withAlpha(77)),
             ),
@@ -628,8 +622,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
         return Column(
           children: [
             // 席位选择 + 刷新行
-            Container(
-              color: Colors.white,
+            Container(color: AppColors.surface,
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,7 +648,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
                                   ),
                                   child: Text(
                                     _shortSeatName(seat),
-                                    style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : AppColors.textSecondary),
+                                    style: TextStyle(fontSize: 12, color: isSelected ? AppColors.textPrimary : AppColors.textSecondary),
                                   ),
                                 ),
                               );
@@ -684,7 +677,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
                               ? null
                               : () => context.read<SeatTrackerCubit>().refreshToday(),
                           icon: state.isLoading
-                              ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
                               : const Icon(Icons.refresh, size: 14),
                           label: Text(state.isLoading ? '刷新中...' : '刷新今日', style: const TextStyle(fontSize: 12)),
                           style: ElevatedButton.styleFrom(
@@ -801,8 +794,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
     final c = color ?? AppColors.primary;
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border.withAlpha(77)),
       ),
@@ -851,8 +843,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
                   width: 100,
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(color: AppColors.cardBackground,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: AppColors.border.withAlpha(77)),
                   ),
@@ -896,8 +887,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border.withAlpha(77)),
       ),

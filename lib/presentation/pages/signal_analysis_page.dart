@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../domain/entities/stock_quote.dart';
@@ -111,7 +113,7 @@ class SignalAnalysisPage extends StatelessWidget {
                       children: [
                         Text(state.stockData.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text('当前价: ${currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                        Text('当前价: ${currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -125,9 +127,9 @@ class SignalAnalysisPage extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildSignalCount('买入', buyCount, Colors.green),
-                        _buildSignalCount('卖出', sellCount, Colors.red),
-                        _buildSignalCount('观望', watchCount, Colors.grey),
+                        _buildSignalCount('买入', buyCount, AppColors.success),
+                        _buildSignalCount('卖出', sellCount, AppColors.error),
+                        _buildSignalCount('观望', watchCount, AppColors.textSecondary),
                       ],
                     ),
                   ),
@@ -151,7 +153,7 @@ class SignalAnalysisPage extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           quotes.length < 60 ? 'E-Ratio分析需要至少60个交易日数据，当前数据不足。' : 'E-Ratio用于评估趋势策略的效率，基于入场信号与实际趋势偏离程度计算。',
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                         ),
                       ],
                     ),
@@ -161,14 +163,14 @@ class SignalAnalysisPage extends StatelessWidget {
                 // Trading suggestion
                 const SizedBox(height: 16),
                 Card(
-                  color: buyCount > sellCount ? Colors.green.withAlpha(13) : sellCount > buyCount ? Colors.red.withAlpha(13) : Colors.grey.withAlpha(13),
+                  color: buyCount > sellCount ? AppColors.success.withAlpha(13) : sellCount > buyCount ? AppColors.error.withAlpha(13) : AppColors.textSecondary.withAlpha(13),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
                         Icon(
                           buyCount > sellCount ? Icons.thumb_up : sellCount > buyCount ? Icons.thumb_down : Icons.remove,
-                          color: buyCount > sellCount ? Colors.green : sellCount > buyCount ? Colors.red : Colors.grey,
+                          color: buyCount > sellCount ? AppColors.success : sellCount > buyCount ? AppColors.error : AppColors.textSecondary,
                           size: 32,
                         ),
                         const SizedBox(height: 8),
@@ -176,11 +178,11 @@ class SignalAnalysisPage extends StatelessWidget {
                           buyCount > sellCount ? '综合信号偏多 ($buyCount买入 vs $sellCount卖出)' : sellCount > buyCount ? '综合信号偏空 ($sellCount卖出 vs $buyCount买入)' : '信号分歧，建议观望',
                           style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.bold,
-                            color: buyCount > sellCount ? Colors.green : sellCount > buyCount ? Colors.red : Colors.grey,
+                            color: buyCount > sellCount ? AppColors.success : sellCount > buyCount ? AppColors.error : AppColors.textSecondary,
                           ),
                         ),
                         if (buyCount >= 4) const SizedBox(height: 4),
-                        if (buyCount >= 4) const Text('多指标共振，看涨信号较强', style: TextStyle(fontSize: 12, color: Colors.green)),
+                        if (buyCount >= 4) const Text('多指标共振，看涨信号较强', style: TextStyle(fontSize: 12, color: AppColors.success)),
                       ],
                     ),
                   ),
@@ -208,7 +210,7 @@ class SignalAnalysisPage extends StatelessWidget {
   }
 
   Widget _buildSignalCard(_SignalItem s) {
-    final badgeColor = s.signal == '买入' ? Colors.green : s.signal == '卖出' ? Colors.red : Colors.grey;
+    final badgeColor = s.signal == '买入' ? AppColors.success : s.signal == '卖出' ? AppColors.error : AppColors.textSecondary;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -226,7 +228,7 @@ class SignalAnalysisPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(s.value, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  Text(s.value, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                   const SizedBox(height: 2),
                   Text(s.reason, style: const TextStyle(fontSize: 12)),
                 ],

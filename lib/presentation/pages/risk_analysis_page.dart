@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../../domain/usecases/calculators/risk_analyzer.dart';
@@ -35,7 +37,7 @@ class RiskAnalysisPage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(state.stockData.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              Text(state.stockData.symbol, style: const TextStyle(color: Colors.grey)),
+                              Text(state.stockData.symbol, style: const TextStyle(color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -58,9 +60,9 @@ class RiskAnalysisPage extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildMetric('30日预期', '${report.expectedReturn30d.toStringAsFixed(1)}%', report.expectedReturn30d >= 0 ? Colors.green : Colors.red),
-                            _buildMetric('60日预期', '${report.expectedReturn60d.toStringAsFixed(1)}%', report.expectedReturn60d >= 0 ? Colors.green : Colors.red),
-                            _buildMetric('夏普比率', report.sharpeRatio.toStringAsFixed(2), report.sharpeRatio >= 0 ? Colors.green : Colors.red),
+                            _buildMetric('30日预期', '${report.expectedReturn30d.toStringAsFixed(1)}%', report.expectedReturn30d >= 0 ? AppColors.success : AppColors.error),
+                            _buildMetric('60日预期', '${report.expectedReturn60d.toStringAsFixed(1)}%', report.expectedReturn60d >= 0 ? AppColors.success : AppColors.error),
+                            _buildMetric('夏普比率', report.sharpeRatio.toStringAsFixed(2), report.sharpeRatio >= 0 ? AppColors.success : AppColors.error),
                             _buildMetric('胜率', '${report.winRate.toStringAsFixed(1)}%', Colors.blue),
                           ],
                         ),
@@ -139,8 +141,8 @@ class RiskAnalysisPage extends StatelessWidget {
                       children: [
                         const Text('止损建议', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         const Divider(),
-                        _buildRow('激进止损', '${report.aggressiveStopLoss.toStringAsFixed(2)}', Colors.orange),
-                        _buildRow('保守止损', '${report.conservativeStopLoss.toStringAsFixed(2)}', Colors.red),
+                        _buildRow('激进止损', '${report.aggressiveStopLoss.toStringAsFixed(2)}', AppColors.warning),
+                        _buildRow('保守止损', '${report.conservativeStopLoss.toStringAsFixed(2)}', AppColors.error),
                         _buildRow('移动止损', '${report.trailingStopLoss.toStringAsFixed(2)}', Colors.blue),
                         const SizedBox(height: 8),
                         const Text('建议仓位', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
@@ -159,8 +161,8 @@ class RiskAnalysisPage extends StatelessWidget {
   }
 
   Widget _buildRiskBadge(RiskReport report) {
-    final color = report.riskRating.contains('低') ? Colors.green
-        : report.riskRating.contains('高') ? Colors.red : Colors.orange;
+    final color = report.riskRating.contains('低') ? AppColors.success
+        : report.riskRating.contains('高') ? AppColors.error : AppColors.warning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -180,7 +182,7 @@ class RiskAnalysisPage extends StatelessWidget {
   Widget _buildMetric(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
       ],
@@ -188,10 +190,10 @@ class RiskAnalysisPage extends StatelessWidget {
   }
 
   Widget _buildTrendChip(String period, String trend) {
-    final color = trend == '上升' ? Colors.green : trend == '下降' ? Colors.red : Colors.grey;
+    final color = trend == '上升' ? AppColors.success : trend == '下降' ? AppColors.error : AppColors.textSecondary;
     return Column(
       children: [
-        Text(period, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(period, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -208,7 +210,7 @@ class RiskAnalysisPage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           Text(value, style: TextStyle(fontWeight: FontWeight.w500, color: color)),
         ],
       ),

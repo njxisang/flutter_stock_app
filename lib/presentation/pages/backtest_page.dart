@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../../domain/usecases/calculators/backtest_calculator.dart';
@@ -51,9 +53,9 @@ class _BacktestPageState extends State<BacktestPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.show_chart, size: 64, color: Colors.grey),
+                  const Icon(Icons.show_chart, size: 64, color: AppColors.textSecondary),
                   const SizedBox(height: 16),
-                  const Text('请先在图表页面加载股票数据', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('请先在图表页面加载股票数据', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -80,7 +82,7 @@ class _BacktestPageState extends State<BacktestPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(state.stockData.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(state.stockData.symbol, style: const TextStyle(color: Colors.grey)),
+                              Text(state.stockData.symbol, style: const TextStyle(color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -112,7 +114,7 @@ class _BacktestPageState extends State<BacktestPage> {
                           onChanged: (v) => setState(() => _selectedStrategy = v!),
                         ),
                         const SizedBox(height: 8),
-                        Text(_strategyDescriptions[_selectedStrategy] ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(_strategyDescriptions[_selectedStrategy] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -237,14 +239,14 @@ class _BacktestPageState extends State<BacktestPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isProfit ? Colors.green.withAlpha(26) : Colors.red.withAlpha(26),
+                color: isProfit ? AppColors.success.withAlpha(26) : AppColors.error.withAlpha(26),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMetric('总收益', '${r.totalProfit >= 0 ? '+' : ''}${r.totalProfit.toStringAsFixed(2)}', isProfit ? Colors.green : Colors.red),
-                  _buildMetric('收益率', '${r.totalProfit >= 0 ? '+' : ''}${(r.totalProfit / r.initialCapital * 100).toStringAsFixed(2)}%', isProfit ? Colors.green : Colors.red),
+                  _buildMetric('总收益', '${r.totalProfit >= 0 ? '+' : ''}${r.totalProfit.toStringAsFixed(2)}', isProfit ? AppColors.success : AppColors.error),
+                  _buildMetric('收益率', '${r.totalProfit >= 0 ? '+' : ''}${(r.totalProfit / r.initialCapital * 100).toStringAsFixed(2)}%', isProfit ? AppColors.success : AppColors.error),
                   _buildMetric('胜率', '${r.winRate.toStringAsFixed(1)}%', Colors.blue),
                 ],
               ),
@@ -273,14 +275,14 @@ class _BacktestPageState extends State<BacktestPage> {
               const Divider(),
               ...r.trades.take(10).map((t) => ListTile(
                     dense: true,
-                    leading: Icon(t.profit >= 0 ? Icons.arrow_upward : Icons.arrow_downward, color: t.profit >= 0 ? Colors.green : Colors.red),
+                    leading: Icon(t.profit >= 0 ? Icons.arrow_upward : Icons.arrow_downward, color: t.profit >= 0 ? AppColors.success : AppColors.error),
                     title: Text('${t.isLong ? "多" : "空"} ${t.entryDate} → ${t.exitDate}'),
                     subtitle: Text('入场:${t.entryPrice.toStringAsFixed(2)} 出场:${t.exitPrice.toStringAsFixed(2)}'),
-                    trailing: Text('${t.profit >= 0 ? "+" : ""}${t.profit.toStringAsFixed(2)}', style: TextStyle(color: t.profit >= 0 ? Colors.green : Colors.red)),
+                    trailing: Text('${t.profit >= 0 ? "+" : ""}${t.profit.toStringAsFixed(2)}', style: TextStyle(color: t.profit >= 0 ? AppColors.success : AppColors.error)),
                   )),
               if (r.trades.length > 10) Padding(
                 padding: const EdgeInsets.all(8),
-                child: Text('还有 ${r.trades.length - 10} 条记录...', style: const TextStyle(color: Colors.grey)),
+                child: Text('还有 ${r.trades.length - 10} 条记录...', style: const TextStyle(color: AppColors.textSecondary)),
               ),
             ],
           ],
@@ -292,7 +294,7 @@ class _BacktestPageState extends State<BacktestPage> {
   Widget _buildMetric(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
       ],
@@ -305,7 +307,7 @@ class _BacktestPageState extends State<BacktestPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
       ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/usecases/calculators/turtle_trading_calculator.dart';
 import '../../domain/entities/stock_quote.dart';
@@ -23,10 +25,10 @@ class TurtleTradingPage extends StatelessWidget {
           );
 
           final signalColor = details.signal == TurtleSignalType.longBreakout
-              ? Colors.green
+              ? AppColors.success
               : details.signal == TurtleSignalType.shortBreakout
-                  ? Colors.red
-                  : Colors.grey;
+                  ? AppColors.error
+                  : AppColors.textSecondary;
           final signalText = details.signal == TurtleSignalType.longBreakout
               ? '做多信号'
               : details.signal == TurtleSignalType.shortBreakout
@@ -49,7 +51,7 @@ class TurtleTradingPage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(state.stockData.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              Text('当前价: ${details.currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                              Text('当前价: ${details.currentPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -85,15 +87,15 @@ class TurtleTradingPage extends StatelessWidget {
                         const Divider(),
                         Row(
                           children: [
-                            Expanded(child: _buildPriceCell('20日高', details.high20, Colors.red)),
-                            Expanded(child: _buildPriceCell('20日低', details.low20, Colors.green)),
+                            Expanded(child: _buildPriceCell('20日高', details.high20, AppColors.error)),
+                            Expanded(child: _buildPriceCell('20日低', details.low20, AppColors.success)),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Expanded(child: _buildPriceCell('10日高', details.high10, Colors.red)),
-                            Expanded(child: _buildPriceCell('10日低', details.low10, Colors.green)),
+                            Expanded(child: _buildPriceCell('10日高', details.high10, AppColors.error)),
+                            Expanded(child: _buildPriceCell('10日低', details.low10, AppColors.success)),
                           ],
                         ),
                         const Divider(),
@@ -126,9 +128,9 @@ class TurtleTradingPage extends StatelessWidget {
                         const Divider(),
                         Row(
                           children: [
-                            Expanded(child: _buildTradeCell('入场价', details.entryPrice, Colors.green)),
-                            Expanded(child: _buildTradeCell('止损价', details.stopLoss, Colors.red)),
-                            Expanded(child: _buildTradeCell('止盈价', details.takeProfit, Colors.orange)),
+                            Expanded(child: _buildTradeCell('入场价', details.entryPrice, AppColors.success)),
+                            Expanded(child: _buildTradeCell('止损价', details.stopLoss, AppColors.error)),
+                            Expanded(child: _buildTradeCell('止盈价', details.takeProfit, AppColors.warning)),
                           ],
                         ),
                         const Divider(),
@@ -143,7 +145,7 @@ class TurtleTradingPage extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.grey.withAlpha(13),
+                              color: AppColors.textSecondary.withAlpha(13),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(details.signalExplanation, style: const TextStyle(fontSize: 13)),
@@ -191,7 +193,7 @@ class TurtleTradingPage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 2),
           Text(value.toStringAsFixed(2), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
         ],
@@ -209,7 +211,7 @@ class TurtleTradingPage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           Text(value.toStringAsFixed(2), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
         ],
@@ -234,7 +236,7 @@ class TurtleTradingPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(desc, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),

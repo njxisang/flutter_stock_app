@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/constants/app_constants.dart';
 import 'core/router/app_router.dart';
 import 'data/datasources/stock_api_service.dart';
 import 'data/datasources/stock_local_storage.dart';
@@ -39,9 +40,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settingsState = SettingsState(settings: storage.getSettings());
-    final isDark = settingsState.settings['darkMode'] ?? false;
-
     return MultiBlocProvider(
       providers: [
         BlocProvider<StockBloc>(
@@ -67,9 +65,31 @@ class MyApp extends StatelessWidget {
         title: '股票MACD',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          primarySwatch: Colors.blue,
           useMaterial3: true,
-          brightness: isDark ? Brightness.dark : Brightness.light,
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: AppColors.background,
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.primary,
+            surface: AppColors.surface,
+            error: AppColors.error,
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.textPrimary,
+            elevation: 0,
+          ),
+          cardTheme: CardThemeData(
+            color: AppColors.cardBackground,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AppColors.border, width: 0.5),
+            ),
+          ),
+          dividerTheme: const DividerThemeData(
+            color: AppColors.divider,
+            thickness: 0.5,
+          ),
         ),
         routerConfig: AppRouter.router,
       ),

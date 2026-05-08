@@ -1,111 +1,116 @@
 import 'package:flutter/material.dart';
 
+/// 同花顺风格配色方案
+/// 核心理念：深色背景 + 高对比涨跌色 + 清晰层次
 class AppColors {
-  // Primary
-  static const Color primary = Color(0xFF238ECF);
-  static const Color primaryDark = Color(0xFF1A6AA5);
+  AppColors._();
 
-  // Chinese market convention: Red up, Green down (沉稳不刺眼版本)
-  static const Color bullish = Color(0xFFCE4040);   // 涨：暗红，比艳红柔和
-  static const Color bearish = Color(0xFF3A8A5A);     // 跌：墨绿，比荧光绿沉稳
+  // ── 主题色 ──────────────────────────────────────────────
+  static const Color primary     = Color(0xFF1E88E5);  // 同花顺蓝（鲜亮）
+  static const Color primaryDark  = Color(0xFF1565C0);
+  static const Color primaryLight = Color(0xFF42A5F5);
 
-  // Chart background - 深黑护眼
-  static const Color chartBackground = Color(0xFF0D1117);
-  static const Color chartBgSecondary = Color(0xFF161B22);
+  // ── A股涨跌色（高对比、更醒目）──
+  // 涨：鲜红 | 跌：翠绿（与同花顺/东方财富一致）
+  static const Color bullish = Color(0xFFED2B2B);   // 涨：正红（鲜亮高对比）
+  static const Color bearish = Color(0xFF21C45E);   // 跌：翠绿（鲜亮高对比）
 
-  // Card / surface
-  static const Color surface = Color(0xFF161B22);
-  static const Color cardBackground = Color(0xFF1C2128);
+  // ── 背景色系（全深色统一）──
+  // 主背景：深灰蓝（非纯黑，更有质感）
+  static const Color background     = Color(0xFF111827);
+  // 卡片/页面表面
+  static const Color surface        = Color(0xFF1A2030);
+  static const Color cardBackground = Color(0xFF1E2535);
+  // 图表背景（稍深以突出K线）
+  static const Color chartBackground    = Color(0xFF0F131C);
+  static const Color chartBgSecondary   = Color(0xFF161B28);
 
-  // Text
-  static const Color textPrimary = Color(0xFFE6EDF3);
-  static const Color textSecondary = Color(0xFF8B949E);
-  static const Color textTertiary = Color(0xFF484F58);
-  static const Color textLight = Color(0xFFE6EDF3);
+  // ── 文字色系 ─────────────────────────────────────────────
+  static const Color textPrimary   = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFF8899AA);  // 次要文字（偏蓝灰）
+  static const Color textTertiary  = Color(0xFF4A5568);  // 辅助/禁用
 
-  // App background (dark mode)
-  static const Color background = Color(0xFF0D1117);
+  // ── K线涨跌（实心）──
+  static const Color bullBody   = Color(0xFFED2B2B);   // 阳线实心
+  static const Color bullWick   = Color(0xFFD42020);   // 阳线影线
+  static const Color bearBody   = Color(0xFF21C45E);   // 阴线实心
+  static const Color bearWick   = Color(0xFF1AAF55);   // 阴线影线
 
-  // ── 图表元素配色 ─────────────────────────────────────
+  // ── K线空心边框 ──────────────────────────────────────────
+  static const Color bullHollow = Color(0xFFED2B2B);
+  static const Color bearHollow = Color(0xFF21C45E);
 
-  // K线涨跌 — 沉稳色
-  static const Color bullBody   = Color(0xFFCE4040);   // 阳线实心
-  static const Color bullWick   = Color(0xFFB03030);   // 阳线影线（略深）
-  static const Color bearBody   = Color(0xFF3A8A5A);   // 阴线实心
-  static const Color bearWick   = Color(0xFF2D6E48);   // 阴线影线（略深）
-  static const Color bullHollow = Color(0xFFCE4040);   // 阴线空心边框同阳线
-  static const Color bearHollow = Color(0xFF3A8A5A);   // 阳线空心边框同阴线
+  // ── K线高亮（触摸态）──
+  static const Color bullBodyHl = Color(0xFFFF4D4D);
+  static const Color bearBodyHl = Color(0xFF2DE075);
 
-  // K线高亮（触摸态）
-  static const Color bullBodyHl  = Color(0xFFE05555);   // 涨高亮
-  static const Color bearBodyHl  = Color(0xFF45A06A);   // 跌高亮
+  // ── 均线配色（色彩分明、不抢焦点）──
+  static const Color ma5Color   = Color(0xFFFF8C00);   // 橙黄（MA5）
+  static const Color ma10Color  = Color(0xFF00B0FF);   // 天蓝（MA10）
+  static const Color ma20Color  = Color(0xFFEA80FC);   // 紫罗兰（MA20）
+  static const Color ma60Color  = Color(0xFFFFD740);   // 金色（MA60）
+  static const Color ma120Color = Color(0xFF00E5FF);   // 青色（MA120）
+  static const Color ma250Color = Color(0xFFF06292);   // 粉色（MA250）
 
-  // 均线 — 色彩区分明显、线条分明
-  static const Color ma5Color  = Color(0xFFFF9B6A);   // 橙色（暖，不抢焦点）
-  static const Color ma10Color = Color(0xFF6AB8FF);   // 天蓝
-  static const Color ma20Color = Color(0xFFBA79E6);   // 薰衣草紫
-  static const Color ma60Color = Color(0xFFFFD06A);   // 金黄
-  static const Color ma120Color = Color(0xFF7AEFE6);  // 青绿
-  static const Color ma250Color = Color(0xFFF0A0F0);  // 粉紫
+  // ── MACD ────────────────────────────────────────────────
+  static const Color difColor  = Color(0xFF00B0FF);
+  static const Color deaColor  = Color(0xFFFF8C00);
+  static const Color macdUp    = Color(0xFFED2B2B);
+  static const Color macdDown = Color(0xFF21C45E);
+  static const Color macdBar   = Color(0xFF8899AA);
 
-  // MACD
-  static const Color difColor = Color(0xFF6AB8FF);
-  static const Color deaColor = Color(0xFFFF9B6A);
-  static const Color macdUp   = Color(0xFFCE4040);
-  static const Color macdDown = Color(0xFF3A8A5A);
-  static const Color macdBar  = Color(0xFF8B949E);
+  // ── KDJ ─────────────────────────────────────────────────
+  static const Color kColor = Color(0xFFFF8C00);
+  static const Color dColor = Color(0xFF00B0FF);
+  static const Color jColor = Color(0xFFEA80FC);
 
-  // KDJ
-  static const Color kColor = Color(0xFFFF9B6A);
-  static const Color dColor = Color(0xFF6AB8FF);
-  static const Color jColor = Color(0xFFBA79E6);
+  // ── BOLL ────────────────────────────────────────────────
+  static const Color bollUpper  = Color(0xFF00B0FF);
+  static const Color bollMiddle = Color(0xFFFF8C00);
+  static const Color bollLower  = Color(0xFFEA80FC);
 
-  // BOLL
-  static const Color bollUpper   = Color(0xFF6AB8FF);
-  static const Color bollMiddle  = Color(0xFFFF9B6A);
-  static const Color bollLower   = Color(0xFFBA79E6);
+  // ── WR ─────────────────────────────────────────────────
+  static const Color wr6Color  = Color(0xFFFF8C00);
+  static const Color wr10Color = Color(0xFF00B0FF);
 
-  // WR
-  static const Color wr6Color  = Color(0xFFFF9B6A);
-  static const Color wr10Color = Color(0xFF6AB8FF);
+  // ── DMI ────────────────────────────────────────────────
+  static const Color pdiColor = Color(0xFFFF8C00);
+  static const Color mdiColor = Color(0xFF00B0FF);
+  static const Color adxColor = Color(0xFFEA80FC);
 
-  // DMI
-  static const Color pdiColor = Color(0xFFFF9B6A);
-  static const Color mdiColor = Color(0xFF6AB8FF);
-  static const Color adxColor = Color(0xFFBA79E6);
+  // ── 网格/坐标轴 ─────────────────────────────────────────
+  static const Color gridLine       = Color(0x1AFFFFFF);    // 10% 白
+  static const Color gridLineStrong = Color(0x30FFFFFF);    // 19% 白
+  static const Color axisLabel      = Color(0xFF4A5568);    // 刻度
+  static const Color axisLabelStrong = Color(0xFF8899AA);   // 重要刻度
 
-  // 网格 / 坐标轴
-  static const Color gridLine  = Color(0x1AFFFFFF);   // 2.5% 白色，极淡
-  static const Color gridLineStrong = Color(0x33FFFFFF); // 20% 白色，适中
-  static const Color axisLabel = Color(0xFF484F58);   // 坐标刻度（小字）
-  static const Color axisLabelStrong = Color(0xFF8B949E); // 重要刻度
+  // ── 十字光标 ─────────────────────────────────────────────
+  static const Color crosshairLine    = Color(0x66FFFFFF);
+  static const Color crosshairTagBg   = Color(0xFFE8F4FD);
+  static const Color crosshairTagText = Color(0xFF111827);
+  static const Color crosshairPriceTag = Color(0xFF00B0FF);
 
-  // 十字光标
-  static const Color crosshairLine = Color(0x66FFFFFF);  // 40% 白
-  static const Color crosshairTagBg = Color(0xFFE6EDF3);
-  static const Color crosshairTagText = Color(0xFF0D1117);
-  static const Color crosshairPriceTag = Color(0xFF6AB8FF);
+  // ── 成交量 ───────────────────────────────────────────────
+  static const Color volUp    = Color(0xFFED2B2B);
+  static const Color volDown  = Color(0xFF21C45E);
+  static const Color volUpA   = Color(0x33ED2B2B);
+  static const Color volDownA = Color(0x3321C45E);
 
-  // 成交量
-  static const Color volUp   = Color(0xFFCE4040);
-  static const Color volDown = Color(0xFF3A8A5A);
-  static const Color volUpA  = Color(0x33CE4040);   // 20% 透明度
-  static const Color volDownA = Color(0x333A8A5A);
+  // ── Tooltip ─────────────────────────────────────────────
+  static const Color tooltipBg     = Color(0xDD1E2535);  // 87% 深蓝灰
+  static const Color tooltipBorder = Color(0x40FFFFFF);
 
-  // Tooltip
-  static const Color tooltipBg = Color(0xDD1C2128);
-  static const Color tooltipBorder = Color(0x33FFFFFF);
+  // ── 状态色 ───────────────────────────────────────────────
+  static const Color success = Color(0xFF21C45E);
+  static const Color warning = Color(0xFFFF8C00);
+  static const Color error   = Color(0xFFED2B2B);
 
-  // ── 状态色 ─────────────────────────────────────────
-  static const Color success  = Color(0xFF3A8A5A);
-  static const Color warning  = Color(0xFFFF9B6A);
-  static const Color error    = Color(0xFFCE4040);
-
-  // ── 边框 / 分割线 ─────────────────────────────────
-  static const Color border   = Color(0xFF30363D);
-  static const Color divider  = Color(0xFF21262D);
+  // ── 边框/分割线 ─────────────────────────────────────────
+  static const Color border  = Color(0xFF2A3444);
+  static const Color divider = Color(0xFF1E2535);
 }
 
+// ─────────────────────────────────────────────────────────
 class AppStrings {
   static const String appName = '股票行情';
   static const String searchHint = '搜索股票代码/名称';
@@ -175,6 +180,7 @@ class AppStrings {
   static const String clearSearchHistory = '清除搜索历史';
 }
 
+// ─────────────────────────────────────────────────────────
 class ChartConstants {
   static const int defaultShortPeriod = 12;
   static const int defaultLongPeriod = 26;
@@ -194,7 +200,7 @@ class ChartConstants {
 
   // 图表样式默认值
   static const bool defaultHollowCandle = false;
-  static const int defaultCandleWidth = 8;      // 1-16
+  static const int defaultCandleWidth = 8;
   static const double defaultWickWidth = 0.8;
   static const double defaultMaWidth = 1.4;
   static const bool defaultShowMa5 = true;
@@ -204,6 +210,7 @@ class ChartConstants {
   static const bool defaultShowVolume = true;
 }
 
+// ─────────────────────────────────────────────────────────
 class ApiConstants {
   static const int cacheValidHours = 1;
   static const int maxHistoryItems = 20;

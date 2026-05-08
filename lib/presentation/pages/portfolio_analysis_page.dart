@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math';
+import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../../data/datasources/stock_api_service.dart';
 import '../blocs/watchlist/watchlist_cubit.dart';
@@ -34,11 +35,11 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.pie_chart_outline, size: 64, color: Colors.grey),
+                  const Icon(Icons.pie_chart_outline, size: 64, color: AppColors.textSecondary),
                   const SizedBox(height: 16),
-                  const Text('自选股为空', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('自选股为空', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 8),
-                  const Text('至少需要2只股票进行组合分析', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text('至少需要2只股票进行组合分析', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.go('/'),
@@ -54,9 +55,9 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.pie_chart_outline, size: 64, color: Colors.grey),
+                  const Icon(Icons.pie_chart_outline, size: 64, color: AppColors.textSecondary),
                   const SizedBox(height: 16),
-                  const Text('至少需要2只股票', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('至少需要2只股票', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.go('/'),
@@ -115,7 +116,7 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
     final count = state.items.length;
     // Simple diversification score based on count
     final divScore = count >= 5 ? 85 : count >= 3 ? 65 : 50;
-    final divColor = divScore >= 70 ? Colors.green : divScore >= 50 ? Colors.orange : Colors.red;
+    final divColor = divScore >= 70 ? AppColors.success : divScore >= 50 ? AppColors.warning : AppColors.error;
 
     return Card(
       child: Padding(
@@ -126,7 +127,7 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
             _buildSummaryItem('股票数量', '$count', Colors.blue),
             _buildSummaryItem('多样化评分', '$divScore', divColor),
             _buildSummaryItem('风险等级', divScore >= 70 ? '低' : divScore >= 50 ? '中' : '高',
-                divScore >= 70 ? Colors.green : divScore >= 50 ? Colors.orange : Colors.red),
+                divScore >= 70 ? AppColors.success : divScore >= 50 ? AppColors.warning : AppColors.error),
           ],
         ),
       ),
@@ -136,7 +137,7 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
   Widget _buildSummaryItem(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
       ],
@@ -159,14 +160,14 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
                   dense: true,
                   title: Text(item.name),
                   subtitle: Text(item.symbol),
-                  trailing: const Text('加载中...', style: TextStyle(color: Colors.grey)),
+                  trailing: const Text('加载中...', style: TextStyle(color: AppColors.textSecondary)),
                 );
               }
               final quotes = data.quotes;
               final first = quotes.first.close;
               final last = quotes.last.close;
               final change = (last - first) / first * 100;
-              final color = change >= 0 ? Colors.green : Colors.red;
+              final color = change >= 0 ? AppColors.success : AppColors.error;
               return ListTile(
                 dense: true,
                 leading: CircleAvatar(
@@ -237,11 +238,11 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _legendBox(Colors.red, '正相关'),
+                _legendBox(AppColors.error, '正相关'),
                 const SizedBox(width: 16),
                 _legendBox(Colors.blue, '负相关'),
                 const SizedBox(width: 16),
-                _legendBox(Colors.white, '无相关'),
+                _legendBox(AppColors.textPrimary, '无相关'),
               ],
             ),
           ],
@@ -251,9 +252,9 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
   }
 
   Widget _buildCorrelationCell(double corr) {
-    final color = corr > 0.3 ? Colors.red.withAlpha((corr * 80).toInt().clamp(20, 200))
+    final color = corr > 0.3 ? AppColors.error.withAlpha((corr * 80).toInt().clamp(20, 200))
         : corr < -0.3 ? Colors.blue.withAlpha((corr.abs() * 80).toInt().clamp(20, 200))
-        : Colors.grey.withAlpha(50);
+        : AppColors.textSecondary.withAlpha(50);
     return Container(
       height: 36,
       margin: const EdgeInsets.all(1),
@@ -261,7 +262,7 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
         color: color,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Center(child: Text(corr.toStringAsFixed(2), style: const TextStyle(fontSize: 10, color: Colors.white))),
+      child: Center(child: Text(corr.toStringAsFixed(2), style: const TextStyle(fontSize: 10, color: AppColors.textPrimary))),
     );
   }
 
@@ -305,9 +306,9 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMetricCard('预期收益', '${avgReturn >= 0 ? '+' : ''}${avgReturn.toStringAsFixed(1)}%', avgReturn >= 0 ? Colors.green : Colors.red),
-                _buildMetricCard('预期风险', '${stdDev.toStringAsFixed(1)}%', Colors.orange),
-                _buildMetricCard('夏普比率', sharpe.toStringAsFixed(2), sharpe >= 0 ? Colors.green : Colors.red),
+                _buildMetricCard('预期收益', '${avgReturn >= 0 ? '+' : ''}${avgReturn.toStringAsFixed(1)}%', avgReturn >= 0 ? AppColors.success : AppColors.error),
+                _buildMetricCard('预期风险', '${stdDev.toStringAsFixed(1)}%', AppColors.warning),
+                _buildMetricCard('夏普比率', sharpe.toStringAsFixed(2), sharpe >= 0 ? AppColors.success : AppColors.error),
               ],
             ),
           ],
@@ -325,7 +326,7 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
       ),
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
         ],

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../blocs/stock/stock_bloc.dart';
@@ -45,9 +47,9 @@ class _HistoryPageState extends State<HistoryPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.history, size: 64, color: Colors.grey),
+                  const Icon(Icons.history, size: 64, color: AppColors.textSecondary),
                   const SizedBox(height: 16),
-                  const Text('暂无搜索历史', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('暂无搜索历史', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.go('/'),
@@ -66,7 +68,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 16),
-                    color: Colors.red,
+                    color: AppColors.error,
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
                   onDismissed: (_) => _removeHistory(symbol),

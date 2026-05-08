@@ -70,7 +70,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
           final isInWatchlist = watchlistState.items.any((item) => item.symbol == data.symbol);
 
           return Container(
-            color: Colors.white,
+            color: AppColors.surface,
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
@@ -218,7 +218,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
           );
         }
         return Container(
-          color: Colors.white,
+          color: AppColors.surface,
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -248,7 +248,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
     final history = storage.getSearchHistory();
 
     return Container(
-      color: Colors.white,
+      color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: Row(
         children: [
@@ -351,7 +351,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.search, size: 64, color: Colors.grey.shade300),
+              Icon(Icons.search, size: 64, color: AppColors.textTertiary),
               const SizedBox(height: 16),
               const Text(
                 AppStrings.pleaseSearchStock,
@@ -374,7 +374,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
       builder: (context, state) {
         final hasData = state is StockLoaded;
         return Container(
-          color: Colors.white,
+          color: AppColors.surface,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
@@ -422,7 +422,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
 
   Widget _buildChartTabs() {
     return Container(
-      color: Colors.white,
+      color: AppColors.surface,
       child: TabBar(
         controller: _tabController,
         labelColor: AppColors.primary,
@@ -453,7 +453,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     margin: const EdgeInsets.only(left: 8),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : Colors.white,
+                      color: isSelected ? AppColors.primary : AppColors.cardBackground,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isSelected ? AppColors.primary : AppColors.border,
@@ -464,7 +464,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                        color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -641,7 +641,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
             ),
             LineChartBarData(
               spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
-              color: AppColors.textLight,
+              color: AppColors.textPrimary,
             ),
           ],
           gridData: FlGridData(show: false),
@@ -723,7 +723,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Column(

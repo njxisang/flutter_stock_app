@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../blocs/watchlist/watchlist_cubit.dart';
@@ -74,11 +76,11 @@ class WatchlistPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.star_border, size: 64, color: Colors.grey),
+                  const Icon(Icons.star_border, size: 64, color: AppColors.textSecondary),
                   const SizedBox(height: 16),
-                  const Text('暂无自选股', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('暂无自选股', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 8),
-                  const Text('在图表页面搜索并添加', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text('在图表页面搜索并添加', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.go('/'),
@@ -102,7 +104,7 @@ class WatchlistPage extends StatelessWidget {
                 background: Container(
                   alignment: Alignment.centerRight,
                   padding: const EdgeInsets.only(right: 16),
-                  color: Colors.red,
+                  color: AppColors.error,
                   child: const Icon(Icons.delete, color: Colors.white),
                 ),
                 onDismissed: (_) {
