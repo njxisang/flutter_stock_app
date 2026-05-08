@@ -11,6 +11,7 @@ import '../../presentation/pages/prediction_page.dart';
 import '../../presentation/pages/turtle_trading_page.dart';
 import '../../presentation/pages/portfolio_analysis_page.dart';
 import '../../presentation/pages/settings_page.dart';
+import '../../presentation/pages/money_flow_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -62,6 +63,12 @@ class AppRouter {
               child: PortfolioAnalysisPage(),
             ),
           ),
+          GoRoute(
+            path: '/money_flow',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: MoneyFlowPage(),
+            ),
+          ),
         ],
       ),
       // Analysis sub-pages (outside ShellRoute so no BottomNav)
@@ -108,7 +115,7 @@ class ScaffoldWithNav extends StatefulWidget {
 class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
   int _currentIndex = 0;
 
-  static const _routes = ['/', '/watchlist', '/history', '/backtest', '/turtle', '/portfolio'];
+  static const _routes = ['/', '/watchlist', '/history', '/backtest', '/turtle', '/portfolio', '/money_flow'];
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +131,7 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
           NavigationDestination(icon: Icon(Icons.play_arrow), label: '回测'),
           NavigationDestination(icon: Icon(Icons.catching_pokemon), label: '海龟'),
           NavigationDestination(icon: Icon(Icons.pie_chart), label: '组合'),
+          NavigationDestination(icon: Icon(Icons.trending_up), label: '资金'),
         ],
       ),
     );
@@ -136,6 +144,7 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
     if (location.startsWith('/backtest')) return 3;
     if (location.startsWith('/turtle')) return 4;
     if (location.startsWith('/portfolio')) return 5;
+    if (location.startsWith('/money_flow')) return 6;
     return 0;
   }
 

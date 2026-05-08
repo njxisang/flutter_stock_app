@@ -240,4 +240,203 @@ class StockApiService {
 
     throw Exception('无法获取股票数据');
   }
+
+  // ============ 龙虎榜 ============
+
+  /// 获取龙虎榜列表（指定日期）
+  Future<List<LhbEntry>> getLhbData({String? date}) async {
+    final targetDate = date ?? _todayStr();
+    final url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_DRAGON_LIST_DAILY&columns=ALL&pageNumber=1&pageSize=50&sortTypes=-1&sortColumns=TRADE_DATE&filter=(TRADE_DATE%3D%27$targetDate%27)';
+
+    try {
+      final response = await _client.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': 'https://data.eastmoney.com/lhb/',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final result = json['result'] as Map<String, dynamic>?;
+        final list = result?['data'] as List<dynamic>?;
+
+        if (list != null) {
+          return list.map((item) {
+            final m = item as Map<String, dynamic>;
+            return LhbEntry(
+              date: m['TRADE_DATE'] ?? '',
+              symbol: m['SECURITY_CODE'] ?? '',
+              name: m['SECURITY_NAME'] ?? '',
+              closePrice: (m['CLOSE_PRICE'] ?? 0).toString(),
+              changePercent: (m['CHANGE_RATE'] ?? 0).toString(),
+              reason: m['EXPLAIN'] ?? '',
+              buyMaxSeat: m['BUY_SEAT_1'] ?? '',
+              sellMaxSeat: m['SELL_SEAT_1'] ?? '',
+              buyAmount: _parseInt(m['BUY_AMT']),
+              sellAmount: _parseInt(m['SELL_AMT']),
+            );
+          }).toList();
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+    return [];
+  }
+
+  /// 获取个股龙虎榜明细（含席位）
+  Future<List<LhbSeatDetail>> getLhbSeatDetail(String symbol, {String? date}) async {
+    final normalized = normalizeSymbol(symbol);
+    final stockCode = normalized.contains('.') ? normalized.split('.')[1] : normalized;
+    final market = detectMarket(symbol);
+    final marketCode = market == Market.sh ? '1' : '0';
+    final targetDate = date ?? _todayStr();
+
+    final url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_STOCK_SEAT_DAILY&columns=ALL&pageNumber=1&pageSize=20&sortTypes=-1&sortColumns=NET_AMT&filter=(TRADE_DATE%3D%27$targetDate%27)(SECUCODE%3D%27$stockCode.SH%27)';
+
+    try {
+      final response = await _client.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Referer': 'https://data.eastmoney.com/',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final result = json['result'] as Map<String, dynamic>?;
+        final list = result?['data'] as List<dynamic>?;
+
+        if (list != null) {
+          return list.map((item) {
+            final m = item as Map<String, dynamic>;
+            final buyAmt = _parseDouble(m['BUY_AMT']);
+            final sellAmt = _parseDouble(m['SELL_AMT']);
+            return LhbSeatDetail(
+              seatName: m['SEAT_NAME'] ?? '',
+              buyAmount: (buyAmt / 10000).toStringAsFixed(0),
+              sellAmount: (sellAmt / 10000).toStringAsFixed(0),
+              netAmount: ((buyAmt - sellAmt) / 10000).toStringAsFixed(0),
+            );
+          }).toList();
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+    return [];
+  }
+
+  // ============ 资金流向 ============
+
+  /// 获取个股资金流向（东方财富）
+  Future<MoneyFlowData> getStockFundFlow(String symbol) async {
+    final normalized = normalizeSymbol(symbol);
+    final stockCode = normalized.contains('.') ? normalized.split('.')[1] : normalized;
+    final market = detectMarket(symbol);
+    final secid = market == Market.sh ? '1.$stockCode' : '0.$stockCode';
+
+    final url = 'https://push2.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=60&klt=101&secid=$secid&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63';
+
+    try {
+      final response = await _client.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Referer': 'https://quote.eastmoney.com/',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final data = json['data'] as Map<String, dynamic>?;
+        final klines = data?['klines'] as List<dynamic>?;
+
+        if (klines != null && klines.isNotEmpty) {
+          final flows = <CapitalFlow>[];
+          for (final item in klines) {
+            final parts = item.toString().split(',');
+            if (parts.length >= 4) {
+              flows.add(CapitalFlow(
+                date: parts[0],
+                bigDealIn: double.tryParse(parts[1]) ?? 0,
+                bigDealOut: double.tryParse(parts[2]) ?? 0,
+                netInflow: double.tryParse(parts[3]) ?? 0,
+                turnoverRate: parts.length > 4 ? (double.tryParse(parts[4]) ?? 0) : 0,
+              ));
+            }
+          }
+          if (flows.isNotEmpty) {
+            final name = await _getStockName(stockCode, market);
+            return MoneyFlowData(symbol: normalized, name: name, flows: flows);
+          }
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+    return MoneyFlowData(symbol: symbol, name: '', flows: []);
+  }
+
+  /// 资金流向实时大单数据
+  Future<Map<String, double>> getFundFlowRealtime(String symbol) async {
+    final normalized = normalizeSymbol(symbol);
+    final stockCode = normalized.contains('.') ? normalized.split('.')[1] : normalized;
+    final market = detectMarket(symbol);
+    final secid = market == Market.sh ? '1.$stockCode' : '0.$stockCode';
+
+    final url = 'https://push2.eastmoney.com/api/qt/stock/fflow/get?secid=$secid&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58';
+
+    try {
+      final response = await _client.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Referer': 'https://quote.eastmoney.com/',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final data = json['data'] as Map<String, dynamic>?;
+        return {
+          'close': (data?['f3'] ?? 0).toDouble(),
+          'priceChange': (data?['f4'] ?? 0).toDouble(),
+          'netInflowMain': (data?['f62'] ?? 0).toDouble(),
+          'netInflowSmall': (data?['f66'] ?? 0).toDouble(),
+          'netInflowMid': (data?['f69'] ?? 0).toDouble(),
+          'turnoverRate': (data?['f168'] ?? 0).toDouble(),
+        };
+      }
+    } catch (e) {
+      // fall through
+    }
+    return {};
+  }
+
+  // ============ 辅助方法 ============
+
+  String _todayStr() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  int _parseInt(dynamic val) {
+    if (val == null) return 0;
+    if (val is int) return val;
+    if (val is double) return val.toInt();
+    final s = val.toString().replaceAll(',', '').replaceAll('--', '0');
+    return int.tryParse(s) ?? 0;
+  }
+
+  double _parseDouble(dynamic val) {
+    if (val == null) return 0;
+    if (val is double) return val;
+    if (val is int) return val.toDouble();
+    final s = val.toString().replaceAll(',', '').replaceAll('--', '0');
+    return double.tryParse(s) ?? 0;
+  }
 }

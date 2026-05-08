@@ -388,3 +388,91 @@ class WatchlistItem extends Equatable {
   @override
   List<Object?> get props => [symbol, name];
 }
+
+// ============ 龙虎榜 ============
+
+/// 龙虎榜单条记录
+class LhbEntry extends Equatable {
+  final String date;           // 交易日期
+  final String symbol;         // 股票代码
+  final String name;          // 股票名称
+  final String closePrice;    // 收盘价
+  final String changePercent; // 涨跌幅
+  final String reason;        // 上榜原因
+  final String buyMaxSeat;   // 买入最多席位
+  final String sellMaxSeat;   // 卖出最多席位
+  final int buyAmount;        // 买入总额（万）
+  final int sellAmount;       // 卖出总额（万）
+
+  const LhbEntry({
+    required this.date,
+    required this.symbol,
+    required this.name,
+    required this.closePrice,
+    required this.changePercent,
+    required this.reason,
+    required this.buyMaxSeat,
+    required this.sellMaxSeat,
+    required this.buyAmount,
+    required this.sellAmount,
+  });
+
+  @override
+  List<Object?> get props => [date, symbol, name, closePrice, changePercent, reason, buyMaxSeat, sellMaxSeat, buyAmount, sellAmount];
+}
+
+/// 龙虎榜席位明细
+class LhbSeatDetail extends Equatable {
+  final String seatName;     // 席位名称
+  final String buyAmount;    // 买入金额（万）
+  final String sellAmount;   // 卖出金额（万）
+  final String netAmount;    // 净买金额（万）
+
+  const LhbSeatDetail({
+    required this.seatName,
+    required this.buyAmount,
+    required this.sellAmount,
+    required this.netAmount,
+  });
+
+  @override
+  List<Object?> get props => [seatName, buyAmount, sellAmount, netAmount];
+}
+
+// ============ 资金流向 ============
+
+/// 单日资金流向
+class CapitalFlow extends Equatable {
+  final String date;          // 日期
+  final double bigDealIn;    // 大单流入
+  final double bigDealOut;   // 大单流出
+  final double netInflow;    // 净流入
+  final double turnoverRate; // 换手率
+
+  const CapitalFlow({
+    required this.date,
+    required this.bigDealIn,
+    required this.bigDealOut,
+    required this.netInflow,
+    required this.turnoverRate,
+  });
+
+  @override
+  List<Object?> get props => [date, bigDealIn, bigDealOut, netInflow, turnoverRate];
+}
+
+/// 资金流向数据（用于画图）
+class MoneyFlowData extends Equatable {
+  final String symbol;
+  final String name;
+  final List<CapitalFlow> flows;
+
+  const MoneyFlowData({
+    required this.symbol,
+    required this.name,
+    required this.flows,
+  });
+
+  @override
+  List<Object?> get props => [symbol, name, flows];
+}

@@ -73,6 +73,15 @@ class StockLocalStorage {
         'kdjPeriod': 9,
         'bollPeriod': 20,
         'darkMode': false,
+        // Chart preferences
+        'hollowCandle': false,
+        'candleWidth': 8,
+        'colorTheme': 'classic',
+        'showMa5': true,
+        'showMa10': true,
+        'showMa20': true,
+        'showMa60': false,
+        'showVolume': true,
       };
     }
     return jsonDecode(json);
