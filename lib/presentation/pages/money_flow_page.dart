@@ -437,18 +437,18 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
             ),
           ),
           const SizedBox(height: 16),
-          // 净流入柱状图
+          // 净流入折线图
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.cardBackground,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border.withAlpha(77)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('近30日净流入（万元）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('近30日净流入（万元）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary)),
                 const SizedBox(height: 12),
                 SizedBox(height: 200, child: _buildFlowChart(flows.take(30).toList().reversed.toList())),
               ],
@@ -495,19 +495,28 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
   Widget _buildFlowChart(List<CapitalFlow> flows) {
     if (flows.isEmpty) return const SizedBox();
     final spots = flows.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.netInflow / 10000)).toList();
+
+    // 分离正负数据用于渐变填充
+    final belowSpots = spots.map((s) => FlSpot(s.x, s.y < 0 ? s.y : 0.0)).toList();
+    final aboveSpots = spots.map((s) => FlSpot(s.x, s.y >= 0 ? s.y : 0.0)).toList();
+
     return LineChart(
       LineChartData(
+        backgroundColor: AppColors.chartBackground,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(color: AppColors.border.withAlpha(77), strokeWidth: 0.5),
+          getDrawingHorizontalLine: (value) => FlLine(color: AppColors.gridLine, strokeWidth: 0.5),
         ),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 45,
-              getTitlesWidget: (value, meta) => Text(value.toStringAsFixed(0), style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+              reservedSize: 48,
+              getTitlesWidget: (value, meta) => Text(
+                value.toStringAsFixed(0),
+                style: const TextStyle(fontSize: 10, color: AppColors.axisLabel),
+              ),
             ),
           ),
           bottomTitles: AxisTitles(
@@ -517,7 +526,10 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
                 final idx = value.toInt();
                 if (idx < 0 || idx >= flows.length) return const SizedBox();
                 final parts = flows[idx].date.split('-');
-                return Text('${parts[1]}/${parts[2]}', style: const TextStyle(fontSize: 9, color: AppColors.textSecondary));
+                return Text(
+                  '${parts[1]}/${parts[2]}',
+                  style: const TextStyle(fontSize: 9, color: AppColors.axisLabel),
+                );
               },
               interval: (flows.length / 5).ceilToDouble().clamp(1, 10),
             ),
@@ -527,19 +539,58 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
+          // 负值区域（流出）
           LineChartBarData(
-            spots: spots,
+            spots: belowSpots,
             isCurved: true,
-            color: AppColors.primary,
+            color: AppColors.bearish,
             barWidth: 1.5,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: AppColors.bullish.withAlpha(25)),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppColors.bearish.withAlpha(30),
+              cutOffY: 0.0,
+              applyCutOffY: true,
+            ),
+          ),
+          // 正值区域（流入）
+          LineChartBarData(
+            spots: aboveSpots,
+            isCurved: true,
+            color: AppColors.bullish,
+            barWidth: 1.5,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppColors.bullish.withAlpha(30),
+              cutOffY: 0.0,
+              applyCutOffY: true,
+            ),
           ),
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            getTooltipItems: (spots) => spots.map((s) => LineTooltipItem('${s.y.toStringAsFixed(2)}万', const TextStyle(color: Colors.white, fontSize: 11))).toList(),
+            getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
+              final isUp = s.y >= 0;
+              return LineTooltipItem(
+                '${isUp ? '+' : ''}${s.y.toStringAsFixed(2)}万',
+                TextStyle(
+                  color: isUp ? AppColors.bullish : AppColors.bearish,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              );
+            }).toList(),
           ),
+        ),
+        extraLinesData: ExtraLinesData(
+          horizontalLines: [
+            HorizontalLine(
+              y: 0,
+              color: AppColors.gridLineStrong,
+              strokeWidth: 0.8,
+            ),
+          ],
         ),
       ),
     );

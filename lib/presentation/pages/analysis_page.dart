@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../../domain/usecases/calculators/multi_factor_analyzer.dart';
 import '../blocs/stock/stock_bloc.dart';
@@ -21,8 +22,10 @@ class _AnalysisPageState extends State<AnalysisPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('多因子分析'),
+        backgroundColor: AppColors.surface,
+        title: Text('多因子分析', style: TextStyle(color: AppColors.textPrimary)),
         actions: [
           IconButton(
             icon: Icon(_showMarketComparison ? Icons.compare_arrows : Icons.show_chart),
@@ -302,22 +305,23 @@ class _AnalysisPageState extends State<AnalysisPage> {
     }
 
     return Card(
+      color: AppColors.cardBackground,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('大盘对比 (相对涨跌)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('大盘对比 (相对涨跌)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             const SizedBox(height: 8),
             Row(
               children: [
-                Container(width: 12, height: 3, color: Colors.blue),
+                Container(width: 12, height: 3, decoration: BoxDecoration(color: AppColors.ma5Color, borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 4),
-                Text(stock.symbol, style: const TextStyle(fontSize: 12)),
+                Text(stock.symbol, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(width: 16),
-                Container(width: 12, height: 3, color: Colors.orange),
+                Container(width: 12, height: 3, decoration: BoxDecoration(color: AppColors.ma10Color, borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 4),
-                const Text('上证指数', style: TextStyle(fontSize: 12)),
+                Text('上证指数', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 8),
@@ -325,10 +329,64 @@ class _AnalysisPageState extends State<AnalysisPage> {
               height: 160,
               child: LineChart(
                 LineChartData(
+                  backgroundColor: AppColors.chartBackground,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (value) => FlLine(color: AppColors.gridLine, strokeWidth: 0.5),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) => Text(
+                          '${value.toStringAsFixed(1)}%',
+                          style: const TextStyle(fontSize: 9, color: AppColors.axisLabel),
+                        ),
+                      ),
+                    ),
+                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
                   lineBarsData: [
-                    LineChartBarData(spots: stockSpots, color: Colors.blue, dotData: const FlDotData(show: false)),
-                    LineChartBarData(spots: indexSpots, color: Colors.orange, dotData: const FlDotData(show: false)),
+                    LineChartBarData(
+                      spots: stockSpots,
+                      color: AppColors.ma5Color,
+                      barWidth: 1.5,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(show: true, color: AppColors.ma5Color.withAlpha(15)),
+                    ),
+                    LineChartBarData(
+                      spots: indexSpots,
+                      color: AppColors.ma10Color,
+                      barWidth: 1.5,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(show: true, color: AppColors.ma10Color.withAlpha(15)),
+                    ),
                   ],
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(y: 0, color: AppColors.gridLineStrong, strokeWidth: 0.8),
+                    ],
+                  ),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
+                        final isStock = s.barIndex == 0;
+                        return LineTooltipItem(
+                          '${s.y >= 0 ? '+' : ''}${s.y.toStringAsFixed(2)}%',
+                          TextStyle(
+                            color: isStock ? AppColors.ma5Color : AppColors.ma10Color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ),
               ),
             ),

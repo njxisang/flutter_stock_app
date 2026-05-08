@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math';
+import '../../core/constants/app_constants.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/stock/stock_bloc.dart';
 
@@ -11,7 +12,11 @@ class PredictionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('价格预测')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        title: Text('价格预测', style: TextStyle(color: AppColors.textPrimary)),
+      ),
       body: BlocBuilder<StockBloc, StockState>(
         builder: (context, state) {
           if (state is! StockLoaded) {
@@ -54,9 +59,9 @@ class PredictionPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(state.stockData.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              Text('当前价: ${currentPrice.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
-                              Text('${currentChange >= 0 ? '+' : ''}${currentChange.toStringAsFixed(2)}%', style: TextStyle(color: currentChange >= 0 ? Colors.green : Colors.red)),
+                              Text(state.stockData.name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                              Text('当前价: ${currentPrice.toStringAsFixed(2)}', style: TextStyle(color: AppColors.textSecondary)),
+                              Text('${currentChange >= 0 ? '+' : ''}${currentChange.toStringAsFixed(2)}%', style: TextStyle(color: currentChange >= 0 ? AppColors.bullish : AppColors.bearish)),
                             ],
                           ),
                         ),
@@ -69,22 +74,23 @@ class PredictionPage extends StatelessWidget {
 
                 // Prediction chart
                 Card(
+                  color: AppColors.cardBackground,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('预测图表 (历史 + 未来10日)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text('预测图表 (历史 + 未来10日)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _legendDot(Colors.grey, '历史'),
+                            _legendDot(AppColors.axisLabel, '历史'),
                             const SizedBox(width: 12),
-                            _legendDot(Colors.blue, 'Holt'),
+                            _legendDot(AppColors.difColor, 'Holt'),
                             const SizedBox(width: 12),
-                            _legendDot(Colors.green, 'LR'),
+                            _legendDot(AppColors.bullish, 'LR'),
                             const SizedBox(width: 12),
-                            _legendDot(Colors.orange, 'ARIMA'),
+                            _legendDot(AppColors.ma60Color, 'ARIMA'),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -100,13 +106,14 @@ class PredictionPage extends StatelessWidget {
 
                 // Prediction table
                 Card(
+                  color: AppColors.cardBackground,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('预测明细', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const Divider(),
+                        Text('预测明细', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        Divider(color: AppColors.border),
                         _buildTableHeader(),
                         ...List.generate(10, (i) {
                           final baseDate = DateTime.now();
@@ -127,13 +134,14 @@ class PredictionPage extends StatelessWidget {
 
                 // Algorithm confidence
                 Card(
+                  color: AppColors.cardBackground,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('算法置信度', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const Divider(),
+                        Text('算法置信度', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        Divider(color: AppColors.border),
                         _buildConfidenceRow('Holt双指数平滑', holtResult.confidence),
                         _buildConfidenceRow('线性回归', lrResult.confidence),
                         _buildConfidenceRow('ARIMA', arimaResult.confidence),
@@ -145,21 +153,22 @@ class PredictionPage extends StatelessWidget {
 
                 // Technical reasons
                 Card(
+                  color: AppColors.cardBackground,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('技术面原因', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const Divider(),
+                        Text('技术面原因', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        Divider(color: AppColors.border),
                         ..._buildTechnicalReasons(state).map((r) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.circle, size: 6, color: Colors.blue),
+                              Icon(Icons.circle, size: 6, color: AppColors.difColor),
                               const SizedBox(width: 8),
-                              Expanded(child: Text(r, style: const TextStyle(fontSize: 13))),
+                              Expanded(child: Text(r, style: TextStyle(fontSize: 13, color: AppColors.textSecondary))),
                             ],
                           ),
                         )),
@@ -176,7 +185,7 @@ class PredictionPage extends StatelessWidget {
   }
 
   Widget _buildTrendBadge(String trend, int confidence) {
-    final color = trend == '上涨' ? Colors.green : trend == '下跌' ? Colors.red : Colors.grey;
+    final color = trend == '上涨' ? AppColors.bullish : trend == '下跌' ? AppColors.bearish : AppColors.textSecondary;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -199,7 +208,7 @@ class PredictionPage extends StatelessWidget {
       children: [
         Container(width: 10, height: 3, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11)),
+        Text(label, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
       ],
     );
   }
@@ -222,12 +231,73 @@ class PredictionPage extends StatelessWidget {
 
     return LineChart(
       LineChartData(
+        backgroundColor: AppColors.chartBackground,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) => FlLine(color: AppColors.gridLine, strokeWidth: 0.5),
+        ),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 50,
+              getTitlesWidget: (value, meta) => Text(
+                value.toStringAsFixed(1),
+                style: const TextStyle(fontSize: 9, color: AppColors.axisLabel),
+              ),
+            ),
+          ),
+          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
         lineBarsData: [
-          LineChartBarData(spots: histSpots, color: Colors.grey, dotData: const FlDotData(show: false)),
-          LineChartBarData(spots: holtSpots, color: Colors.blue, dotData: const FlDotData(show: false)),
-          LineChartBarData(spots: lrSpots, color: Colors.green, dotData: const FlDotData(show: false)),
-          LineChartBarData(spots: arimaSpots, color: Colors.orange, dotData: const FlDotData(show: false)),
+          // 历史
+          LineChartBarData(
+            spots: histSpots,
+            color: AppColors.axisLabel,
+            barWidth: 1.2,
+            dotData: const FlDotData(show: false),
+          ),
+          // Holt
+          LineChartBarData(
+            spots: holtSpots,
+            color: AppColors.difColor,
+            barWidth: 1.5,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(show: true, color: AppColors.difColor.withAlpha(15)),
+          ),
+          // LR
+          LineChartBarData(
+            spots: lrSpots,
+            color: AppColors.bullish,
+            barWidth: 1.5,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(show: true, color: AppColors.bullish.withAlpha(15)),
+          ),
+          // ARIMA
+          LineChartBarData(
+            spots: arimaSpots,
+            color: AppColors.ma60Color,
+            barWidth: 1.5,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(show: true, color: AppColors.ma60Color.withAlpha(15)),
+          ),
         ],
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
+              final colors = [AppColors.axisLabel, AppColors.difColor, AppColors.bullish, AppColors.ma60Color];
+              final color = s.barIndex < colors.length ? colors[s.barIndex] : AppColors.textPrimary;
+              return LineTooltipItem(
+                s.y.toStringAsFixed(2),
+                TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
@@ -235,15 +305,15 @@ class PredictionPage extends StatelessWidget {
   Widget _buildTableHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade300))),
-      child: const Row(
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border))),
+      child: Row(
         children: [
-          Expanded(flex: 2, child: Text('日期', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 2, child: Text('综合', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 2, child: Text('Holt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 2, child: Text('LR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 2, child: Text('ARIMA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 1, child: Text('趋势', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+          Expanded(flex: 2, child: Text('日期', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary))),
+          Expanded(flex: 2, child: Text('综合', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary))),
+          Expanded(flex: 2, child: Text('Holt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary))),
+          Expanded(flex: 2, child: Text('LR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary))),
+          Expanded(flex: 2, child: Text('ARIMA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary))),
+          Expanded(flex: 1, child: Text('趋势', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary))),
         ],
       ),
     );
@@ -252,15 +322,15 @@ class PredictionPage extends StatelessWidget {
   Widget _buildTableRow(String date, double avg, double holt, double lr, double arima, String trend) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border))),
       child: Row(
         children: [
-          Expanded(flex: 2, child: Text(date, style: const TextStyle(fontSize: 11))),
-          Expanded(flex: 2, child: Text(avg.toStringAsFixed(2), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500))),
-          Expanded(flex: 2, child: Text(holt.toStringAsFixed(2), style: const TextStyle(fontSize: 11, color: Colors.blue))),
-          Expanded(flex: 2, child: Text(lr.toStringAsFixed(2), style: const TextStyle(fontSize: 11, color: Colors.green))),
-          Expanded(flex: 2, child: Text(arima.toStringAsFixed(2), style: const TextStyle(fontSize: 11, color: Colors.orange))),
-          Expanded(flex: 1, child: Text(trend, style: TextStyle(fontSize: 12, color: trend == '↑' ? Colors.green : trend == '↓' ? Colors.red : Colors.grey))),
+          Expanded(flex: 2, child: Text(date, style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+          Expanded(flex: 2, child: Text(avg.toStringAsFixed(2), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
+          Expanded(flex: 2, child: Text(holt.toStringAsFixed(2), style: TextStyle(fontSize: 11, color: AppColors.difColor))),
+          Expanded(flex: 2, child: Text(lr.toStringAsFixed(2), style: TextStyle(fontSize: 11, color: AppColors.bullish))),
+          Expanded(flex: 2, child: Text(arima.toStringAsFixed(2), style: TextStyle(fontSize: 11, color: AppColors.ma60Color))),
+          Expanded(flex: 1, child: Text(trend, style: TextStyle(fontSize: 12, color: trend == '↑' ? AppColors.bullish : trend == '↓' ? AppColors.bearish : AppColors.textSecondary))),
         ],
       ),
     );
@@ -271,16 +341,16 @@ class PredictionPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          SizedBox(width: 100, child: Text(name, style: const TextStyle(fontSize: 13))),
+          SizedBox(width: 100, child: Text(name, style: TextStyle(fontSize: 13, color: AppColors.textSecondary))),
           Expanded(
             child: LinearProgressIndicator(
               value: confidence / 100,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation(confidence > 60 ? Colors.green : Colors.orange),
+              backgroundColor: AppColors.border,
+              valueColor: AlwaysStoppedAnimation(confidence > 60 ? AppColors.bullish : AppColors.warning),
             ),
           ),
           const SizedBox(width: 8),
-          Text('$confidence%', style: const TextStyle(fontSize: 12)),
+          Text('$confidence%', style: TextStyle(fontSize: 12, color: AppColors.textPrimary)),
         ],
       ),
     );
