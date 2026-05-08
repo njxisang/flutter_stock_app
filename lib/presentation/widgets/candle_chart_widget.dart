@@ -50,6 +50,19 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
   int? _touchedIdx;
   Offset? _touchPos;
 
+  // ── Quick range buttons ──────────────────────────────────────────────────
+  static const _rangeOptions = [
+    (label: '1月', days: 22),
+    (label: '3月', days: 66),
+    (label: '6月', days: 126),
+    (label: '1年', days: 242),
+  ];
+  int _selectedRangeIdx = -1; // -1 = free scroll
+
+  // ── Horizontal pan ───────────────────────────────────────────────────────
+  double? _lastPanDx; // last horizontal drag offset in px
+  int? _lastPanBaseIdx; // _startIdx at drag start
+
   bool get _hollow    => widget.hollowCandle   ?? ChartConstants.defaultHollowCandle;
   int  get _candleW   => widget.candleWidth    ?? ChartConstants.defaultCandleWidth;
   double get _wickW   => widget.wickWidth      ?? ChartConstants.defaultWickWidth;
@@ -64,6 +77,10 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
   @override
   void initState() {
     super.initState();
+    _initRange();
+  }
+
+  void _initRange() {
     _endIdx = widget.quotes.length;
     _startIdx = math.max(0, _endIdx - _defaultVisible);
   }
@@ -72,8 +89,7 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
   void didUpdateWidget(CandleChartWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.quotes.length != widget.quotes.length) {
-      _endIdx = widget.quotes.length;
-      _startIdx = math.max(0, _endIdx - _defaultVisible);
+      _initRange();
     }
   }
 
@@ -131,6 +147,47 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
     }
   }
 
+  void _selectRange(int idx) {
+    if (idx == _selectedRangeIdx) {
+      // Deselect — return to full scroll
+      setState(() { _selectedRangeIdx = -1; });
+      _initRange();
+      return;
+    }
+    setState(() => _selectedRangeIdx = idx);
+    final days = _rangeOptions[idx].days;
+    final n = days.clamp(20, widget.quotes.length);
+    setState(() {
+      _endIdx = widget.quotes.length;
+      _startIdx = (widget.quotes.length - n).clamp(0, widget.quotes.length - 1);
+    });
+  }
+
+  // ── Horizontal pan ────────────────────────────────────────────────────────
+  void _onPanStart(DragStartDetails d, double chartW) {
+    _lastPanDx = d.localPosition.dx;
+    _lastPanBaseIdx = _startIdx;
+  }
+
+  void _onPanUpdate(DragUpdateDetails d, double chartW) {
+    if (_lastPanDx == null) return;
+    final dx = _lastPanDx! - d.localPosition.dx; // positive = drag right → earlier data
+    final cw = chartW / _displayCount;
+    final candlesShift = (dx / cw).round();
+    if (candlesShift == 0) return;
+    setState(() {
+      _startIdx = (candlesShift + _startIdx).clamp(0, widget.quotes.length - _displayCount);
+      _endIdx = (_startIdx + _displayCount).clamp(0, widget.quotes.length);
+      _selectedRangeIdx = -1;
+    });
+    _lastPanDx = d.localPosition.dx;
+  }
+
+  void _onPanEnd(DragEndDetails d) {
+    _lastPanDx = null;
+    _lastPanBaseIdx = null;
+  }
+
   void _handleScale(ScaleUpdateDetails d, double chartWidth) {
     setState(() {
       if (d.scale != 1.0) {
@@ -181,6 +238,11 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
+
+        // Reserve ~28px at the top for the quick-range buttons bar
+        const rangeBarH = 28.0;
+        final chartH = (h - rangeBarH).clamp(80.0, h);
+
         final alignedMa = _getAlignedMa();
         final theme = _themeColors();
 
@@ -188,65 +250,113 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
         final rightPad = w > 400 ? 52.0 : 44.0;
         const topPad = 8.0;
         const botPad = 24.0;
-        final volH = _showVol ? (h > 280 ? 48.0 : 36.0) : 0.0;
+        final volH = _showVol ? (chartH > 280 ? 48.0 : 36.0) : 0.0;
         const volSep = 6.0;
         final chartW = w - leftPad - rightPad;
 
-        return Listener(
-          onPointerSignal: (event) {
-            if (event is PointerScrollEvent) {
-              setState(() {
-                final newVis = (_displayCount * (1 + event.scrollDelta.dy * 0.001))
-                    .round().clamp(20, widget.quotes.length);
-                final center = _startIdx + _displayCount ~/ 2;
-                _startIdx = (center - newVis ~/ 2).clamp(0, widget.quotes.length - newVis);
-                _endIdx = _startIdx + newVis;
-                _scale = 1.0;
-              });
-            }
-          },
-          child: GestureDetector(
-            onScaleUpdate: (d) => _handleScale(d, chartW),
-            onTapUp: (d) => _onTapUp(d, chartW, leftPad),
-            onLongPressStart: (d) => _onLongPressStart(d, chartW, leftPad),
-            onLongPressMoveUpdate: (d) => _onLongPressMove(d, chartW, leftPad),
-            onLongPressEnd: _onLongPressEnd,
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.chartBackground,
-                borderRadius: BorderRadius.circular(6),
+        return Column(
+          children: [
+            // ── Quick range buttons ─────────────────────────────────────────
+            SizedBox(
+              height: rangeBarH,
+              child: Row(
+                children: [
+                  SizedBox(width: leftPad),
+                  ...List.generate(_rangeOptions.length, (i) {
+                    final selected = _selectedRangeIdx == i;
+                    return GestureDetector(
+                      onTap: () => _selectRange(i),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.primary.withAlpha(30)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: selected ? AppColors.primary : AppColors.border,
+                            width: selected ? 1.2 : 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          _rangeOptions[i].label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                            color: selected ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  const Spacer(),
+                ],
               ),
-              child: CustomPaint(
-                size: Size(w, h),
-                painter: _CandlePainter(
-                  quotes: widget.quotes,
-                  ma5: alignedMa.ma5,
-                  ma10: alignedMa.ma10,
-                  ma20: alignedMa.ma20,
-                  ma60: alignedMa.ma60,
-                  startIdx: _startIdx,
-                  endIdx: _endIdx,
-                  scale: _scale,
-                  touchedIdx: _touchedIdx,
-                  touchPos: _touchPos,
-                  leftPad: leftPad, rightPad: rightPad,
-                  topPad: topPad, botPad: botPad,
-                  volH: volH, volSep: volSep,
-                  hollow: _hollow,
-                  candleBodyW: _candleW.toDouble(),
-                  wickWidth: _wickW,
-                  maLineWidth: _maW,
-                  showMa5: _showMa5, showMa10: _showMa10,
-                  showMa20: _showMa20, showMa60: _showMa60,
-                  showVolume: _showVol,
-                  bull: theme.bull, bear: theme.bear,
-                  bullWick: theme.bullWick, bearWick: theme.bearWick,
-                  bullVol: theme.bullVol, bearVol: theme.bearVol,
-                  bullVolA: theme.bullVolA, bearVolA: theme.bearVolA,
+            ),
+            // ── Chart canvas ────────────────────────────────────────────────
+            Expanded(
+              child: Listener(
+                onPointerSignal: (event) {
+                  if (event is PointerScrollEvent) {
+                    setState(() {
+                      final newVis = (_displayCount * (1 + event.scrollDelta.dy * 0.001))
+                          .round().clamp(20, widget.quotes.length);
+                      final center = _startIdx + _displayCount ~/ 2;
+                      _startIdx = (center - newVis ~/ 2).clamp(0, widget.quotes.length - newVis);
+                      _endIdx = _startIdx + newVis;
+                      _scale = 1.0;
+                    });
+                  }
+                },
+                child: GestureDetector(
+                  onScaleUpdate: (d) => _handleScale(d, chartW),
+                  onTapUp: (d) => _onTapUp(d, chartW, leftPad),
+                  onLongPressStart: (d) => _onLongPressStart(d, chartW, leftPad),
+                  onLongPressMoveUpdate: (d) => _onLongPressMove(d, chartW, leftPad),
+                  onLongPressEnd: _onLongPressEnd,
+                  onHorizontalDragStart: (d) => _onPanStart(d, chartW),
+                  onHorizontalDragUpdate: (d) => _onPanUpdate(d, chartW),
+                  onHorizontalDragEnd: _onPanEnd,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.chartBackground,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: CustomPaint(
+                      size: Size(w, chartH),
+                      painter: _CandlePainter(
+                        quotes: widget.quotes,
+                        ma5: alignedMa.ma5,
+                        ma10: alignedMa.ma10,
+                        ma20: alignedMa.ma20,
+                        ma60: alignedMa.ma60,
+                        startIdx: _startIdx,
+                        endIdx: _endIdx,
+                        scale: _scale,
+                        touchedIdx: _touchedIdx,
+                        touchPos: _touchPos,
+                        leftPad: leftPad, rightPad: rightPad,
+                        topPad: topPad, botPad: botPad,
+                        volH: volH, volSep: volSep,
+                        hollow: _hollow,
+                        candleBodyW: _candleW.toDouble(),
+                        wickWidth: _wickW,
+                        maLineWidth: _maW,
+                        showMa5: _showMa5, showMa10: _showMa10,
+                        showMa20: _showMa20, showMa60: _showMa60,
+                        showVolume: _showVol,
+                        bull: theme.bull, bear: theme.bear,
+                        bullWick: theme.bullWick, bearWick: theme.bearWick,
+                        bullVol: theme.bullVol, bearVol: theme.bearVol,
+                        bullVolA: theme.bullVolA, bearVolA: theme.bearVolA,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         );
       },
     );
