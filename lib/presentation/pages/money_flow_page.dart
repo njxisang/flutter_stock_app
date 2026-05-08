@@ -951,15 +951,37 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
   }
 
   String _shortSeatName(String seat) {
-    // 中信证券上海溧阳路 -> 溧阳路
     if (seat.contains('溧阳路')) return '溧阳路';
     if (seat.contains('太平南路')) return '太平南路';
-    if (seat.contains('益田路')) return '益田路';
-    if (seat.contains('深南东路')) return '深南东路';
-    if (seat.contains('团结路')) return '团结路';
-    if (seat.contains('上塘路')) return '上塘路';
-    if (seat.contains('和源路')) return '和源路';
-    if (seat.contains('东方路')) return '东方路';
+    if (seat.contains('解放北路')) return '解放路';
+    if (seat.contains('作手余哥')) return '余哥';
+    if (seat.contains('小鳄鱼')) return '小鳄鱼';
+    if (seat.contains('佛山')) return '佛山';
+    if (seat.contains('成都')) return '成都';
+    if (seat.contains('长江路')) return '长江路';
+    if (seat.contains('机构专用')) return '机构';
+    if (seat.contains('高盛')) return '高盛';
+    if (seat.contains('摩根大通')) return '摩根';
+    if (seat.contains('瑞银')) return '瑞银';
+    if (seat.contains('中金上海')) return '中金上海';
+    if (seat.contains('中金北京')) return '中金北京';
+    if (seat.contains('沪股通')) return '沪股通';
+    if (seat.contains('深股通')) return '深股通';
+    if (seat.contains('国泰海通证券总部')) return '国泰总部';
+    if (seat.contains('中信证券上海分公司')) return '中信上海';
+    if (seat.contains('国盛证券宁波桑田')) return '桑田路';
+    if (seat.contains('华泰证券深圳益田路荣超')) return '华泰益田';
+    if (seat.contains('华鑫证券上海宛平')) return '华鑫宛平';
+    if (seat.contains('华泰证券苏州吴中')) return '华泰吴中';
+    if (seat.contains('开源证券西安太华')) return '开源太华';
+    if (seat.contains('国信证券深圳红岭')) return '国信红岭';
+    if (seat.contains('中信建投证券上海营口')) return '建投营口';
+    if (seat.contains('招商证券深圳益田路')) return '招商益田';
+    if (seat.contains('中国银河证券宜昌新世纪')) return '银河宜昌';
+    if (seat.contains('平安证券杭州曙光')) return '平安曙光';
+    if (seat.contains('东亚前海证券深圳')) return '东亚深圳';
+    if (seat.contains('国泰海通证券上海')) return '国泰上海';
+    if (seat.contains('国泰海通证券成都北一环路')) return '国泰成都';
     return seat.length > 6 ? '${seat.substring(0, 5)}...' : seat;
   }
 
