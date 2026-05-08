@@ -28,6 +28,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
   List<LhbEntry> _lhbList = [];
   bool _lhbLoading = false;
   String _lhbDate = '';
+  LhbSummaryModel? _lhbSummary; // 龙虎榜日报摘要
 
   // 资金流向数据
   MoneyFlowData? _moneyFlowData;
@@ -56,13 +57,29 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
     setState(() {
       _lhbLoading = true;
       _lhbDate = date ?? _todayStr();
+      _lhbSummary = null; // 清空旧摘要
     });
 
     try {
-      final list = await _lhbApi.getLhbData(date: _lhbDate);
+      // 列表数据和日报摘要并行拉取
+      final results = await Future.wait([
+        _lhbApi.getLhbData(date: _lhbDate),
+        _lhbApi.getLhbSeatRaw(date: _lhbDate),
+      ]);
+      final list = results[0] as List<LhbEntry>;
+      final rawEntries = results[1] as List<LhbSeatRawEntry>;
+
+      // 构建日报摘要（新建仓判断依赖历史 last_seen，传入空map则不判断新建仓）
+      final summary = LhbSummaryService.build(
+        date: _lhbDate,
+        entries: rawEntries,
+        prevLastSeen: const {},
+      );
+
       if (mounted) {
         setState(() {
           _lhbList = list;
+          _lhbSummary = summary;
           _lhbLoading = false;
         });
       }
@@ -218,7 +235,7 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
           children: [
             const Icon(Icons.list_alt, size: 48, color: AppColors.textSecondary),
             const SizedBox(height: 8),
-            const Text('今日龙虎榜暂无数据', style: TextStyle(color: AppColors.textSecondary)),
+            Text('龙虎榜暂无数据 (${_lhbDate})', style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(onPressed: () => _loadLhb(), child: const Text('刷新')),
           ],
@@ -231,9 +248,13 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
       color: AppColors.primary,
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 8),
-        itemCount: _lhbList.length,
+        itemCount: _lhbList.length + 1, // +1 for summary header
         itemBuilder: (context, index) {
-          final item = _lhbList[index];
+          // 0: 日报摘要头
+          if (index == 0) {
+            return _buildLhbSummaryHeader(_lhbSummary, _lhbDate);
+          }
+          final item = _lhbList[index - 1];
           final changePct = double.tryParse(item.changePercent) ?? 0;
           final isUp = changePct >= 0;
           final pctColor = isUp ? AppColors.bullish : AppColors.bearish;
@@ -299,6 +320,256 @@ class _MoneyFlowPageState extends State<MoneyFlowPage>
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(color: AppColors.primary.withAlpha(15), borderRadius: BorderRadius.circular(4)),
       child: Text('$label:${_shortSeat(seat)}', style: const TextStyle(fontSize: 10, color: AppColors.primary)),
+    );
+  }
+
+  // ============ 龙虎榜日报摘要 ============
+
+  Widget _buildLhbSummaryHeader(LhbSummaryModel? summary, String date) {
+    if (summary == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border.withAlpha(77)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withAlpha(15),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.assessment, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '📊 龙虎榜日报 · $date',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(25),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${summary.totalStocks}只',
+                    style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 概览行
+                _buildSummaryOverview(summary),
+                const SizedBox(height: 10),
+
+                // 涨幅榜
+                if (summary.topGainers.isNotEmpty) ...[
+                  _buildSummarySectionHeader('🔥', '涨幅榜 TOP${summary.topGainers.length}'),
+                  const SizedBox(height: 4),
+                  ...summary.topGainers.map((s) => _buildRankRow(s, isUp: true)),
+                  const SizedBox(height: 10),
+                ],
+
+                // 跌幅榜
+                if (summary.topLosers.isNotEmpty) ...[
+                  _buildSummarySectionHeader('📉', '跌幅榜 TOP${summary.topLosers.length}'),
+                  const SizedBox(height: 4),
+                  ...summary.topLosers.map((s) => _buildRankRow(s, isUp: false)),
+                  const SizedBox(height: 10),
+                ],
+
+                // 席位类型流向
+                if (summary.seatTypeSummary.isNotEmpty) ...[
+                  _buildSummarySectionHeader('💰', '席位资金流向'),
+                  const SizedBox(height: 4),
+                  ...summary.seatTypeSummary.map((s) => _buildSeatTypeRow(s)),
+                  const SizedBox(height: 10),
+                ],
+
+                // 新建仓
+                if (summary.newPositions.isNotEmpty) ...[
+                  _buildSummarySectionHeader('⭐', '重点关注 · ${summary.newPositions.length}只新建仓'),
+                  const SizedBox(height: 4),
+                  ...summary.newPositions.map((s) => _buildNewPositionRow(s)),
+                ],
+
+                if (summary.topGainers.isEmpty && summary.topLosers.isEmpty && summary.seatTypeSummary.isEmpty) ...[
+                  const Center(child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text('暂无龙虎榜席位数据', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  )),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryOverview(LhbSummaryModel summary) {
+    return Row(
+      children: [
+        _buildOverviewChip('📈 涨', summary.upCount.toString(), AppColors.bullish),
+        const SizedBox(width: 8),
+        _buildOverviewChip('📉 跌', summary.downCount.toString(), AppColors.bearish),
+        const SizedBox(width: 8),
+        _buildOverviewChip('📋 席位记录', '${summary.totalEntries}条', AppColors.textSecondary),
+      ],
+    );
+  }
+
+  Widget _buildOverviewChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: TextStyle(fontSize: 11, color: color)),
+          const SizedBox(width: 3),
+          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummarySectionHeader(String emoji, String title) {
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 12)),
+        const SizedBox(width: 4),
+        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+      ],
+    );
+  }
+
+  Widget _buildRankRow(LhbStockRank s, {required bool isUp}) {
+    final arrow = s.totalNet >= 0 ? '🟢' : '🔴';
+    final color = isUp ? AppColors.bullish : AppColors.bearish;
+    return Container(
+      margin: const EdgeInsets.only(top: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withAlpha(10),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            child: Text(
+              s.changeDisplay,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              '${s.name}(${s.code})',
+              style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '$arrow ${s.netDisplay}',
+            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          ),
+          const SizedBox(width: 6),
+          if (s.topBuySeat.isNotEmpty)
+            Text(
+              '买一 ${_shortSeatName(s.topBuySeat)}',
+              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeatTypeRow(SeatTypeSummary s) {
+    final isPositive = s.totalNet >= 0;
+    final color = isPositive ? AppColors.bullish : AppColors.bearish;
+    return Container(
+      margin: const EdgeInsets.only(top: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withAlpha(20),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              s.typeName,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '买${s.buyDisplay} / 卖${s.sellDisplay}',
+              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+            ),
+          ),
+          Text(
+            '净买${s.netDisplay}',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewPositionRow(LhbStockRank s) {
+    final color = AppColors.bullish;
+    return Container(
+      margin: const EdgeInsets.only(top: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withAlpha(15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: Row(
+        children: [
+          const Text('🆕', style: TextStyle(fontSize: 11)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              '${s.name}(${s.code}) ${s.changeDisplay}',
+              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '净买${s.netDisplay}  [${_shortSeatName(s.seat ?? s.topBuySeat)}]',
+            style: TextStyle(fontSize: 10, color: color),
+          ),
+        ],
+      ),
     );
   }
 
