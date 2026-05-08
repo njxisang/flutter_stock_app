@@ -28,9 +28,9 @@ class SettingsPage extends StatelessWidget {
                 _SwitchTile(
                   title: AppStrings.solidCandle,
                   subtitle: '实心填充K线',
-                  value: !(s['hollowCandle'] ?? false),
+                  value: s['hollowCandle'] == false,  // false=实心(默认), true=空心
                   onChanged: (v) => context.read<SettingsCubit>()
-                      .updateSetting('hollowCandle', !v),
+                      .updateSetting('hollowCandle', !v),  // v=false时存false(实心), v=true时存true(空心)
                 ),
                 _SliderTile(
                   title: '${AppStrings.candleWidth}：${s['candleWidth'] ?? 8}',
@@ -140,52 +140,54 @@ class SettingsPage extends StatelessWidget {
       context: context,
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('清除搜索历史', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const Text('为确认清除，请在下方输入"清除"', style: TextStyle(fontSize: 14)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: '输入"清除"',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('清除搜索历史', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Text('为确认清除，请在下方输入"清除"', style: TextStyle(fontSize: 14)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: '输入"清除"',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('取消'),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('取消'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () async {
-                      if (controller.text == '清除') {
-                        Navigator.pop(ctx);
-                        await context.read<SettingsCubit>().clearSearchHistory();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('搜索历史已清除')),
-                          );
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
+                        if (controller.text == '清除') {
+                          Navigator.pop(ctx);
+                          await context.read<SettingsCubit>().clearSearchHistory();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('搜索历史已清除')),
+                            );
+                          }
                         }
-                      }
-                    },
-                    child: const Text('确认'),
+                      },
+                      child: const Text('确认'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

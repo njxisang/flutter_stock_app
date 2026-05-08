@@ -3,7 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 // States
 class ChartState extends Equatable {
-  final int currentTab;
+  final int currentTab;      // 主图表类型: 0=K线, 1=分时, 2=日K, 3=周K, 4=月K, 5=指数
+  final int indicatorTab;    // 副图指标: 0=MACD, 1=RSI, 2=KDJ, 3=WR, 4=BOLL, 5=DMI
   final int shortPeriod;
   final int longPeriod;
   final int signalPeriod;
@@ -13,6 +14,7 @@ class ChartState extends Equatable {
 
   const ChartState({
     this.currentTab = 0,
+    this.indicatorTab = 0,
     this.shortPeriod = 12,
     this.longPeriod = 26,
     this.signalPeriod = 9,
@@ -23,6 +25,7 @@ class ChartState extends Equatable {
 
   ChartState copyWith({
     int? currentTab,
+    int? indicatorTab,
     int? shortPeriod,
     int? longPeriod,
     int? signalPeriod,
@@ -32,6 +35,7 @@ class ChartState extends Equatable {
   }) {
     return ChartState(
       currentTab: currentTab ?? this.currentTab,
+      indicatorTab: indicatorTab ?? this.indicatorTab,
       shortPeriod: shortPeriod ?? this.shortPeriod,
       longPeriod: longPeriod ?? this.longPeriod,
       signalPeriod: signalPeriod ?? this.signalPeriod,
@@ -42,7 +46,7 @@ class ChartState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [currentTab, shortPeriod, longPeriod, signalPeriod, rsiPeriod, kdjPeriod, bollPeriod];
+  List<Object?> get props => [currentTab, indicatorTab, shortPeriod, longPeriod, signalPeriod, rsiPeriod, kdjPeriod, bollPeriod];
 }
 
 // Cubit
@@ -51,6 +55,10 @@ class ChartCubit extends Cubit<ChartState> {
 
   void changeTab(int tabIndex) {
     emit(state.copyWith(currentTab: tabIndex));
+  }
+
+  void changeIndicatorTab(int tabIndex) {
+    emit(state.copyWith(indicatorTab: tabIndex));
   }
 
   void updatePeriods({

@@ -179,7 +179,21 @@ class _BacktestPageState extends State<BacktestPage> {
                     child: _isRunning ? const CircularProgressIndicator() : const Text('运行回测'),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
+                // Collapsed params summary when result is shown
+                if (_result != null) ...[
+                  ExpansionTile(
+                    title: Text('策略: ${_getStrategyName(_selectedStrategy)} | 初始: ${_initialCapitalController.text} | 费率: ${_feeRateController.text}',
+                      style: const TextStyle(fontSize: 12)),
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: EdgeInsets.zero,
+                    children: [
+                      _buildParamSummary(),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
 
                 // Results
                 if (_result != null) _buildResultCard(),
@@ -310,6 +324,25 @@ class _BacktestPageState extends State<BacktestPage> {
           Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildParamSummary() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('本次参数', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Divider(),
+            _buildRow('策略', _getStrategyName(_selectedStrategy)),
+            _buildRow('初始资金', _initialCapitalController.text),
+            _buildRow('费率', _feeRateController.text),
+            _buildRow('仓位比例', _positionRatioController.text),
+          ],
+        ),
       ),
     );
   }

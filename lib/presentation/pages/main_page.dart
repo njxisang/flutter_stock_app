@@ -16,23 +16,15 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin {
+class _MainPageState extends State<MainPage> {
   final _searchController = TextEditingController();
-  late TabController _tabController;
 
   final _tabNames = ['K线', '分时', '日K', '周K', '月K', '指数'];
   final _indicatorTabs = ['MACD', 'RSI', 'KDJ', 'BOLL', 'MA', 'WR', 'DMI'];
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: _tabNames.length, vsync: this);
-  }
-
-  @override
   void dispose() {
     _searchController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -244,8 +236,6 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
 
   Widget _buildSearchBar() {
     context.watch<StockBloc>();
-    final storage = context.read<StockBloc>().stockStorage;
-    final history = storage.getSearchHistory();
 
     return Container(
       color: AppColors.surface,
@@ -261,14 +251,24 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
               ),
               child: TextField(
                 controller: _searchController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: AppStrings.searchHint,
                   hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                   prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
                 style: const TextStyle(fontSize: 14),
+                onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _searchStock(),
               ),
             ),
@@ -380,7 +380,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
             children: [
               if (hasData)
                 Text(
-                  '${(state as StockLoaded).startDate} ~ ${state.endDate}',
+                  '${state.startDate} ~ ${state.endDate}',
                   style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               const Spacer(),
@@ -421,17 +421,39 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildChartTabs() {
+    final chartCubit = context.watch<ChartCubit>();
+    final currentTab = chartCubit.state.currentTab;
     return Container(
       color: AppColors.surface,
-      child: TabBar(
-        controller: _tabController,
-        labelColor: AppColors.primary,
-        unselectedLabelColor: AppColors.textSecondary,
-        indicatorColor: AppColors.primary,
-        indicatorSize: TabBarIndicatorSize.label,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-        unselectedLabelStyle: const TextStyle(fontSize: 13),
-        tabs: _tabNames.map((e) => Tab(text: e)).toList(),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _tabNames.asMap().entries.map((entry) {
+            final isSelected = currentTab == entry.key;
+            return GestureDetector(
+              onTap: () => chartCubit.changeTab(entry.key),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -446,9 +468,9 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
             scrollDirection: Axis.horizontal,
             child: Row(
               children: _indicatorTabs.asMap().entries.map((entry) {
-                final isSelected = chartState.currentTab == entry.key;
+                final isSelected = chartState.indicatorTab == entry.key;
                 return GestureDetector(
-                  onTap: () => context.read<ChartCubit>().changeTab(entry.key),
+                  onTap: () => context.read<ChartCubit>().changeIndicatorTab(entry.key),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     margin: const EdgeInsets.only(left: 8),
@@ -478,24 +500,54 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildChart(StockLoaded state) {
+    // 顶部 Tab 控制主图类型（目前暂时都渲染 K 线，6 个 Tab 代表不同时间维度）
     final chartTab = context.watch<ChartCubit>().state.currentTab;
-    switch (chartTab) {
+    // 底部 Chip 控制副图指标
+    final indicatorTab = context.watch<ChartCubit>().state.indicatorTab;
+
+    final mainChart = _buildMainChart(chartTab, state);
+    final indicatorChart = _buildIndicatorChart(indicatorTab, state);
+
+    return Column(
+      children: [
+        Expanded(flex: 3, child: mainChart),
+        const Divider(height: 1, color: AppColors.border),
+        Expanded(flex: 1, child: indicatorChart),
+      ],
+    );
+  }
+
+  Widget _buildMainChart(int chartTab, StockLoaded state) {
+    // ⚠️ 限制说明：免费A股行情API（东方财富/新浪）不提供日K/周K/月K分时间周期数据接口，
+    // 当前所有Tab均渲染日K线。后续可接入付费数据源（如Tushare Pro）实现真正的周期切换。
+    // 6个Tab[K线/分时/日K/周K/月K/指数]在数据源具备条件后可分别渲染：
+    //   Tab 0 K线 — 日K柱状图（当前）
+    //   Tab 1 分时 — 分时图（需1分钟数据）
+    //   Tab 2 日K — 日K柱状图
+    //   Tab 3 周K — 周K柱状图（需周线数据）
+    //   Tab 4 月K — 月K柱状图（需月线数据）
+    //   Tab 5 指数 — 专属指数（如查看上证指数时）
+    return _buildKLineChart(state.stockData.quotes, state.maData);
+  }
+
+  Widget _buildIndicatorChart(int indicatorTab, StockLoaded state) {
+    switch (indicatorTab) {
       case 0:
-        return _buildKLineChart(state.stockData.quotes, state.maData);
-      case 1:
         return _buildMacdChart(state.macdData);
-      case 2:
+      case 1:
         return _buildRsiChart(state.rsiData);
-      case 3:
+      case 2:
         return _buildKdjChart(state.kdjData);
-      case 4:
+      case 3:
         return _buildBollChart(state.bollData, state.stockData.quotes);
-      case 5:
+      case 4:
         return _buildMaChart(state.maData);
-      case 6:
+      case 5:
         return _buildWrChart(state.wrData);
+      case 6:
+        return _buildDmiChart(state.dmiData);
       default:
-        return _buildKLineChart(state.stockData.quotes, state.maData);
+        return _buildMacdChart(state.macdData);
     }
   }
 
@@ -664,18 +716,29 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
                     color: AppColors.bollUpper,
+                    isCurved: true,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
                     color: AppColors.bollMiddle,
+                    isCurved: true,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
                     color: AppColors.bollLower,
+                    isCurved: true,
                   ),
                   LineChartBarData(
                     spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
                     color: AppColors.textPrimary,
+                  ),
+                ],
+                betweenBarsData: [
+                  // 在上轨(0)和下轨(2)之间填充带状
+                  BetweenBarsData(
+                    fromIndex: 0,
+                    toIndex: 2,
+                    color: AppColors.bollUpper.withOpacity(0.08),
                   ),
                 ],
                 gridData: FlGridData(show: false),
@@ -771,8 +834,53 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
     );
   }
 
+  Widget _buildDmiChart(List<DmiData> data) {
+    if (data.isEmpty) return const Center(child: Text('数据不足'));
+    final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.chartBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.pdi)).toList(),
+                    color: AppColors.pdiColor ?? AppColors.primary,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.mdi)).toList(),
+                    color: AppColors.mdiColor ?? AppColors.bearish,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.adx)).toList(),
+                    color: AppColors.adxColor ?? AppColors.textSecondary,
+                  ),
+                ],
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStockDetails(StockLoaded state) {
-    final q = state.stockData.quotes.last;
+    final quotes = state.stockData.quotes;
+    if (quotes.length < 2) return const SizedBox.shrink();
+    final q = quotes.last;
+    final prevQ = quotes[quotes.length - 2];
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: const BoxDecoration(
@@ -787,6 +895,15 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
               _buildDetailItem('最高', q.high.toStringAsFixed(2)),
               _buildDetailItem('最低', q.low.toStringAsFixed(2)),
               _buildDetailItem('成交量', _formatVolume(q.volume)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildDetailItem('收盘', q.close.toStringAsFixed(2)),
+              _buildDetailItem('成交额', _formatTurnover(q)),
+              _buildDetailItem('昨收', prevQ.close.toStringAsFixed(2)),
+              _buildDetailItem('涨跌额', '${q.close >= prevQ.close ? '+' : ''}${(q.close - prevQ.close).toStringAsFixed(2)}'),
             ],
           ),
         ],
@@ -816,6 +933,16 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
       return '${(volume / 10000).toStringAsFixed(2)}万';
     }
     return volume.toString();
+  }
+
+  String _formatTurnover(StockQuote q) {
+    final turnover = q.close * q.volume;
+    if (turnover >= 100000000) {
+      return '${(turnover / 100000000).toStringAsFixed(2)}亿';
+    } else if (turnover >= 10000) {
+      return '${(turnover / 10000).toStringAsFixed(2)}万';
+    }
+    return turnover.toStringAsFixed(0);
   }
 
   void _searchStock() {

@@ -141,9 +141,9 @@ class RiskAnalysisPage extends StatelessWidget {
                       children: [
                         const Text('止损建议', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         const Divider(),
-                        _buildRow('激进止损', '${report.aggressiveStopLoss.toStringAsFixed(2)}', AppColors.warning),
-                        _buildRow('保守止损', '${report.conservativeStopLoss.toStringAsFixed(2)}', AppColors.error),
-                        _buildRow('移动止损', '${report.trailingStopLoss.toStringAsFixed(2)}', Colors.blue),
+                        _buildRow('激进止损', '${report.aggressiveStopLoss.toStringAsFixed(2)} 元', AppColors.warning),
+                        _buildRow('保守止损', '${report.conservativeStopLoss.toStringAsFixed(2)} 元', AppColors.error),
+                        _buildRow('移动止损', '${report.trailingStopLoss.toStringAsFixed(2)} 元', Colors.blue),
                         const SizedBox(height: 8),
                         const Text('建议仓位', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 4),

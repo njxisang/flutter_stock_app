@@ -63,9 +63,9 @@ class SignalAnalysisPage extends StatelessWidget {
 
           String getWrSignal() {
             if (wr == null) return '观望';
-            // WR: 0 to -100. >-20 means overbought (sell), <-80 means oversold (buy)
-            if (wr.wr6 > -80) { buyCount++; return '买入'; }
-            if (wr.wr6 < -20) { sellCount++; return '卖出'; }
+            // WR: 0 to -100. WR > -20 means overbought → sell; WR < -80 means oversold → buy
+            if (wr.wr6 < -80) { buyCount++; return '买入'; }
+            if (wr.wr6 > -20) { sellCount++; return '卖出'; }
             watchCount++; return '观望';
           }
 

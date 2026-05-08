@@ -396,6 +396,20 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
+  /// 根据股票代码前缀智能选择大盘指数
+  /// 沪主板(6开头) → 上证指数(000001)
+  /// 深主板(0/3开头，4位数) → 深证成指(399001)
+  /// 创业板(300开头) → 创业板指(399006)
+  /// 科创板(688开头) → 科创50(000688)
+  String _getIndexSymbol(String stockSymbol) {
+    if (stockSymbol.startsWith('6')) return '000001';   // 上证指数
+    if (stockSymbol.startsWith('300')) return '399006';  // 创业板指
+    if (stockSymbol.startsWith('688')) return '000688';  // 科创50
+    if (stockSymbol.startsWith('000') || stockSymbol.startsWith('001')) return '399001'; // 深证成指
+    if (stockSymbol.startsWith('399')) return '399001'; // 深证系列
+    return '000001'; // 默认上证
+  }
+
   Future<void> _loadMarketComparison(BuildContext context) async {
     if (_indexData != null) {
       setState(() => _showMarketComparison = !_showMarketComparison);
@@ -404,7 +418,10 @@ class _AnalysisPageState extends State<AnalysisPage> {
     setState(() => _loadingIndex = true);
     try {
       final bloc = context.read<StockBloc>();
-      final indexData = await bloc.apiService.getStockData('000001');
+      final state = bloc.state;
+      final stockSymbol = state is StockLoaded ? state.stockData.symbol : '';
+      final indexSymbol = _getIndexSymbol(stockSymbol);
+      final indexData = await bloc.apiService.getStockData(indexSymbol);
       if (mounted) {
         setState(() {
           _indexData = indexData;

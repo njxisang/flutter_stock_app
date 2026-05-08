@@ -116,9 +116,13 @@ class PredictionPage extends StatelessWidget {
                         Divider(color: AppColors.border),
                         _buildTableHeader(),
                         ...List.generate(10, (i) {
-                          final baseDate = DateTime.now();
-                          final predDate = baseDate.add(Duration(days: i + 1));
-                          final dateStr = '${predDate.month}/${predDate.day}';
+                          // 从最后一个有数据的交易日起，跳过周末依次推算未来交易日
+                          final lastDateStr = quotes.last.date;
+                          var predDate = DateTime.parse(lastDateStr);
+                          for (var j = 0; j <= i; j++) {
+                            predDate = _nextTradingDay(predDate);
+                          }
+                          final dateStr = _formatPredDate(predDate);
                           final holt = holtResult.prices.length > i ? holtResult.prices[i] : 0.0;
                           final lr = lrResult.prices.length > i ? lrResult.prices[i] : 0.0;
                           final arima = arimaResult.prices.length > i ? arimaResult.prices[i] : 0.0;
@@ -300,6 +304,19 @@ class PredictionPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // 跳过周末，按 A 股交易日计算
+  DateTime _nextTradingDay(DateTime from) {
+    var d = from.add(const Duration(days: 1));
+    while (d.weekday == DateTime.saturday || d.weekday == DateTime.sunday) {
+      d = d.add(const Duration(days: 1));
+    }
+    return d;
+  }
+
+  String _formatPredDate(DateTime date) {
+    return '${date.month}/${date.day}';
   }
 
   Widget _buildTableHeader() {

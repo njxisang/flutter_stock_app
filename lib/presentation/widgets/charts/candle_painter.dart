@@ -317,7 +317,7 @@ class CandlePainter extends CustomPainter {
     final priceTp = TextPainter(
       text: TextSpan(
         text: q.close.toStringAsFixed(2),
-        style: TextStyle(color: AppColors.crosshairTagText, fontSize: 9, fontWeight: FontWeight.bold),
+        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -328,7 +328,7 @@ class CandlePainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(tagX, tagY, tagW, tagH), Radius.circular(4)),
-      Paint()..color = tagCol,
+      Paint()..color = tagCol.withAlpha(230),
     );
     priceTp.paint(canvas, Offset(tagX + tagPad, tagY + tagPad / 2));
 

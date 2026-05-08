@@ -47,6 +47,16 @@ class WatchlistPage extends StatelessWidget {
                     ],
                   ),
                 ),
+                PopupMenuItem(
+                  value: WatchlistSort.changePercent,
+                  child: Row(
+                    children: [
+                      if (current == WatchlistSort.changePercent) const Icon(Icons.check, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('涨跌幅'),
+                    ],
+                  ),
+                ),
               ];
             },
           ),
@@ -101,6 +111,22 @@ class WatchlistPage extends StatelessWidget {
               return Dismissible(
                 key: Key(item.symbol),
                 direction: DismissDirection.endToStart,
+                confirmDismiss: (_) async {
+                  return await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('移除自选'),
+                      content: Text('确定从自选列表移除 "${item.name}" 吗？'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('移除', style: TextStyle(color: AppColors.error)),
+                        ),
+                      ],
+                    ),
+                  ) ?? false;
+                },
                 background: Container(
                   alignment: Alignment.centerRight,
                   padding: const EdgeInsets.only(right: 16),
@@ -113,7 +139,12 @@ class WatchlistPage extends StatelessWidget {
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(context).primaryColor,
-                    child: Text(item.symbol.substring(0, item.symbol.length > 2 ? 2 : item.symbol.length)),
+                    child: Text(
+                      item.symbol.length > 3
+                          ? item.symbol.substring(0, 3)
+                          : item.symbol,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
                   ),
                   title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w500)),
                   subtitle: Text(item.symbol, style: const TextStyle(fontSize: 11)),

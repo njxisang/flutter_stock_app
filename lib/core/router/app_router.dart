@@ -115,7 +115,7 @@ class ScaffoldWithNav extends StatefulWidget {
 class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
   int _currentIndex = 0;
 
-  static const _routes = ['/', '/watchlist', '/history', '/backtest', '/turtle', '/portfolio', '/money_flow'];
+  static const _routes = ['/', '/watchlist', '/backtest', '/turtle', '/portfolio', '/money_flow'];
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +127,6 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.show_chart), label: 'K线'),
           NavigationDestination(icon: Icon(Icons.star), label: '自选'),
-          NavigationDestination(icon: Icon(Icons.history), label: '历史'),
           NavigationDestination(icon: Icon(Icons.play_arrow), label: '回测'),
           NavigationDestination(icon: Icon(Icons.catching_pokemon), label: '海龟'),
           NavigationDestination(icon: Icon(Icons.pie_chart), label: '组合'),
@@ -140,11 +139,10 @@ class _ScaffoldWithNavState extends State<ScaffoldWithNav> {
   int _calculateSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith('/watchlist')) return 1;
-    if (location.startsWith('/history')) return 2;
-    if (location.startsWith('/backtest')) return 3;
-    if (location.startsWith('/turtle')) return 4;
-    if (location.startsWith('/portfolio')) return 5;
-    if (location.startsWith('/money_flow')) return 6;
+    if (location.startsWith('/backtest')) return 2;
+    if (location.startsWith('/turtle')) return 3;
+    if (location.startsWith('/portfolio')) return 4;
+    if (location.startsWith('/money_flow')) return 5;
     return 0;
   }
 
