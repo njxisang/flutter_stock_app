@@ -511,9 +511,14 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: CandleChartWidget(
-        quotes: displayQuotes,
-        maData: maData,
+      child: SizedBox.expand(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: CandleChartWidget(
+            quotes: displayQuotes,
+            maData: maData,
+          ),
+        ),
       ),
     );
   }
@@ -528,23 +533,31 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
-              color: AppColors.difColor,
-              isCurved: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
+                    color: AppColors.difColor,
+                    isCurved: true,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
+                    color: AppColors.deaColor,
+                    isCurved: true,
+                  ),
+                ],
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
-              color: AppColors.deaColor,
-              isCurved: true,
-            ),
-          ],
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -560,20 +573,28 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
-              color: AppColors.primary,
-              isCurved: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
+                    color: AppColors.primary,
+                    isCurved: true,
+                  ),
+                ],
+                minY: 0,
+                maxY: 100,
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
             ),
-          ],
-          minY: 0,
-          maxY: 100,
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -589,25 +610,33 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
-              color: AppColors.kColor,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
+                    color: AppColors.kColor,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
+                    color: AppColors.dColor,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
+                    color: AppColors.jColor,
+                  ),
+                ],
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
-              color: AppColors.dColor,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
-              color: AppColors.jColor,
-            ),
-          ],
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -624,29 +653,37 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
-              color: AppColors.bollUpper,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
+                    color: AppColors.bollUpper,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
+                    color: AppColors.bollMiddle,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
+                    color: AppColors.bollLower,
+                  ),
+                  LineChartBarData(
+                    spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
+                    color: AppColors.textPrimary,
+                  ),
+                ],
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
-              color: AppColors.bollMiddle,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
-              color: AppColors.bollLower,
-            ),
-            LineChartBarData(
-              spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
-              color: AppColors.textPrimary,
-            ),
-          ],
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -662,25 +699,33 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
-              color: AppColors.ma5Color,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
+                    color: AppColors.ma5Color,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
+                    color: AppColors.ma10Color,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
+                    color: AppColors.ma20Color,
+                  ),
+                ],
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
-              color: AppColors.ma10Color,
-            ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
-              color: AppColors.ma20Color,
-            ),
-          ],
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
@@ -696,23 +741,31 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
-              color: AppColors.wr6Color,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: constraints.maxHeight,
+            child: LineChart(
+              LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
+                    color: AppColors.wr6Color,
+                  ),
+                  LineChartBarData(
+                    spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
+                    color: AppColors.wr10Color,
+                  ),
+                ],
+                minY: -100,
+                maxY: 0,
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(show: false),
+                borderData: FlBorderData(show: false),
+              ),
             ),
-            LineChartBarData(
-              spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
-              color: AppColors.wr10Color,
-            ),
-          ],
-          minY: -100,
-          maxY: 0,
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
+          ),
         ),
       ),
     );
