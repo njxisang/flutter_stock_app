@@ -300,9 +300,10 @@ class StockApiService {
         if (response.statusCode == 200) {
           _cacheResponse(url, response.body, response.headers, 'EastMoney StockName');
           final json = jsonDecode(response.body);
-          final QuotationCode = json['QuotationCode'] as List<dynamic>?;
-          if (QuotationCode != null && QuotationCode.isNotEmpty) {
-            final name = QuotationCode[0]['Name'] as String?;
+          final table = json['QuotationCodeTable'] as Map<String, dynamic>?;
+          final data = table?['Data'] as List<dynamic>?;
+          if (data != null && data.isNotEmpty) {
+            final name = data[0]['Name'] as String?;
             if (name != null && name.isNotEmpty) {
               return name;
             }
