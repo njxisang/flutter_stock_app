@@ -344,6 +344,15 @@ class TurtleTrade extends Equatable {
   List<Object?> get props => [entryDate, entryPrice, exitDate, exitPrice, quantity, isLong, profit, profitPercent, holdingDays, atrAtEntry, atrAtExit, stopLoss, takeProfit, exitReason];
 }
 
+class TradeExitReason {
+  static const String reverseSignal = '反向信号';
+  static const String stopLoss = '止损';
+  static const String takeProfit = '止盈';
+  static const String timeExit = '时间止损';
+  static const String limitUp = '涨停无法卖出';
+  static const String limitDown = '跌停无法卖出';
+}
+
 class Trade extends Equatable {
   final String entryDate;
   final double entryPrice;
@@ -355,6 +364,7 @@ class Trade extends Equatable {
   final double profitPercent;
   final int holdingDays;
   final double fee;
+  final String? exitReason; // nullable for backward compatibility
 
   const Trade({
     required this.entryDate,
@@ -367,10 +377,11 @@ class Trade extends Equatable {
     required this.profitPercent,
     required this.holdingDays,
     required this.fee,
+    this.exitReason,
   });
 
   @override
-  List<Object?> get props => [entryDate, entryPrice, exitDate, exitPrice, quantity, isLong, profit, profitPercent, holdingDays, fee];
+  List<Object?> get props => [entryDate, entryPrice, exitDate, exitPrice, quantity, isLong, profit, profitPercent, holdingDays, fee, exitReason];
 }
 
 class BacktestResult extends Equatable {

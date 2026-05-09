@@ -32,6 +32,9 @@ class _BacktestPageState extends State<BacktestPage> {
   bool _showAdvancedParams = false;
   StrategyParams _params = const StrategyParams();
 
+  // ─── B-4 Fix: 统一管理 TextEditingController，避免内存泄漏 ───
+  final Map<String, TextEditingController> _paramControllers = {};
+
   // ─── 日期 ───
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 365));
   DateTime _endDate = DateTime.now();
@@ -44,6 +47,33 @@ class _BacktestPageState extends State<BacktestPage> {
   void initState() {
     super.initState();
     _buildDefaultPresets();
+    // B-4 Fix: 初始化策略参数 TextEditingController
+    _initParamControllers();
+  }
+
+  void _initParamControllers() {
+    _paramControllers['macdFastPeriod']   = TextEditingController(text: _params.macdFastPeriod.toString());
+    _paramControllers['macdSlowPeriod']   = TextEditingController(text: _params.macdSlowPeriod.toString());
+    _paramControllers['macdSignalPeriod']  = TextEditingController(text: _params.macdSignalPeriod.toString());
+    _paramControllers['kdjPeriod']        = TextEditingController(text: _params.kdjPeriod.toString());
+    _paramControllers['kdjKPeriod']        = TextEditingController(text: _params.kdjKPeriod.toString());
+    _paramControllers['kdjDPeriod']        = TextEditingController(text: _params.kdjDPeriod.toString());
+    _paramControllers['kdjOverbought']    = TextEditingController(text: _params.kdjOverbought.toString());
+    _paramControllers['kdjOversold']      = TextEditingController(text: _params.kdjOversold.toString());
+    _paramControllers['rsiPeriod']         = TextEditingController(text: _params.rsiPeriod.toString());
+    _paramControllers['rsiOverbought']     = TextEditingController(text: _params.rsiOverbought.toString());
+    _paramControllers['rsiOversold']      = TextEditingController(text: _params.rsiOversold.toString());
+    _paramControllers['bollPeriod']         = TextEditingController(text: _params.bollPeriod.toString());
+    _paramControllers['bollStdDev']        = TextEditingController(text: _params.bollStdDev.toString());
+    _paramControllers['maShortPeriod']     = TextEditingController(text: _params.maShortPeriod.toString());
+    _paramControllers['maMidPeriod']       = TextEditingController(text: _params.maMidPeriod.toString());
+    _paramControllers['maLongPeriod']      = TextEditingController(text: _params.maLongPeriod.toString());
+    _paramControllers['wrPeriod']          = TextEditingController(text: _params.wrPeriod.toString());
+    _paramControllers['wrOverbought']      = TextEditingController(text: _params.wrOverbought.toString());
+    _paramControllers['wrOversold']        = TextEditingController(text: _params.wrOversold.toString());
+    _paramControllers['dmiPeriod']          = TextEditingController(text: _params.dmiPeriod.toString());
+    _paramControllers['dmiAdxPeriod']      = TextEditingController(text: _params.dmiAdxPeriod.toString());
+    _paramControllers['dmiTrendThreshold'] = TextEditingController(text: _params.dmiTrendThreshold.toString());
   }
 
   void _buildDefaultPresets() {
@@ -123,6 +153,10 @@ class _BacktestPageState extends State<BacktestPage> {
     _initialCapitalController.dispose();
     _feeRateController.dispose();
     _positionRatioController.dispose();
+    // B-4 Fix: 释放所有策略参数 TextEditingController
+    for (final controller in _paramControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -368,168 +402,33 @@ class _BacktestPageState extends State<BacktestPage> {
     );
   }
 
-  Widget _buildStrategyParamsSection() {
-    switch (_selectedStrategy) {
-      case BacktestStrategy.macd:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('MACD 参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('快线周期', _params.macdFastPeriod, (v) => setState(() => _params = _params.copyWith(macdFastPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('慢线周期', _params.macdSlowPeriod, (v) => setState(() => _params = _params.copyWith(macdSlowPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('信号周期', _params.macdSignalPeriod, (v) => setState(() => _params = _params.copyWith(macdSignalPeriod: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.kdj:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('KDJ 参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('周期', _params.kdjPeriod, (v) => setState(() => _params = _params.copyWith(kdjPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('超买区', _params.kdjOverbought, (v) => setState(() => _params = _params.copyWith(kdjOverbought: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('超卖区', _params.kdjOversold, (v) => setState(() => _params = _params.copyWith(kdjOversold: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.rsi:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('RSI 参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('周期', _params.rsiPeriod, (v) => setState(() => _params = _params.copyWith(rsiPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('超买阈值', _params.rsiOverbought, (v) => setState(() => _params = _params.copyWith(rsiOverbought: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('超卖阈值', _params.rsiOversold, (v) => setState(() => _params = _params.copyWith(rsiOversold: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.boll:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('BOLL 参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('周期', _params.bollPeriod, (v) => setState(() => _params = _params.copyWith(bollPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('标准差倍数', _params.bollStdDev, (v) => setState(() => _params = _params.copyWith(bollStdDev: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.ma:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('MA 均线参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('短期', _params.maShortPeriod, (v) => setState(() => _params = _params.copyWith(maShortPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('中期', _params.maMidPeriod, (v) => setState(() => _params = _params.copyWith(maMidPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('长期', _params.maLongPeriod, (v) => setState(() => _params = _params.copyWith(maLongPeriod: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.wr:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('WR 威廉参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('周期', _params.wrPeriod, (v) => setState(() => _params = _params.copyWith(wrPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('超买阈值', _params.wrOverbought, (v) => setState(() => _params = _params.copyWith(wrOverbought: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('超卖阈值', _params.wrOversold, (v) => setState(() => _params = _params.copyWith(wrOversold: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.dmi:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('DMI 参数', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('DI周期', _params.dmiPeriod, (v) => setState(() => _params = _params.copyWith(dmiPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('ADX周期', _params.dmiAdxPeriod, (v) => setState(() => _params = _params.copyWith(dmiAdxPeriod: v)))),
-                const SizedBox(width: 8),
-                Expanded(child: _buildIntParamField('趋势阈值', _params.dmiTrendThreshold, (v) => setState(() => _params = _params.copyWith(dmiTrendThreshold: v)))),
-              ],
-            ),
-          ],
-        );
-      case BacktestStrategy.multi:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('综合指标参数（多策略共振）', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('MACD快', _params.macdFastPeriod, (v) => setState(() => _params = _params.copyWith(macdFastPeriod: v)))),
-                const SizedBox(width: 4),
-                Expanded(child: _buildIntParamField('MACD慢', _params.macdSlowPeriod, (v) => setState(() => _params = _params.copyWith(macdSlowPeriod: v)))),
-                const SizedBox(width: 4),
-                Expanded(child: _buildIntParamField('MACD信', _params.macdSignalPeriod, (v) => setState(() => _params = _params.copyWith(macdSignalPeriod: v)))),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('RSI周期', _params.rsiPeriod, (v) => setState(() => _params = _params.copyWith(rsiPeriod: v)))),
-                const SizedBox(width: 4),
-                Expanded(child: _buildIntParamField('RSI超买', _params.rsiOverbought, (v) => setState(() => _params = _params.copyWith(rsiOverbought: v)))),
-                const SizedBox(width: 4),
-                Expanded(child: _buildIntParamField('RSI超卖', _params.rsiOversold, (v) => setState(() => _params = _params.copyWith(rsiOversold: v)))),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(child: _buildIntParamField('KDJ周期', _params.kdjPeriod, (v) => setState(() => _params = _params.copyWith(kdjPeriod: v)))),
-                const SizedBox(width: 4),
-                Expanded(child: _buildIntParamField('KDJ超买', _params.kdjOverbought, (v) => setState(() => _params = _params.copyWith(kdjOverbought: v)))),
-                const SizedBox(width: 4),
-                Expanded(child: _buildIntParamField('KDJ超卖', _params.kdjOversold, (v) => setState(() => _params = _params.copyWith(kdjOversold: v)))),
-              ],
-            ),
-          ],
-        );
-    }
-  }
+  // ─── B-4 Fix: 参数更新回调 ───
+  void _onMacdFastPeriodChanged(int v) { setState(() { _params = _params.copyWith(macdFastPeriod: v); }); _paramControllers['macdFastPeriod']?.text = v.toString(); }
+  void _onMacdSlowPeriodChanged(int v) { setState(() { _params = _params.copyWith(macdSlowPeriod: v); }); _paramControllers['macdSlowPeriod']?.text = v.toString(); }
+  void _onMacdSignalPeriodChanged(int v) { setState(() { _params = _params.copyWith(macdSignalPeriod: v); }); _paramControllers['macdSignalPeriod']?.text = v.toString(); }
+  void _onKdjPeriodChanged(int v) { setState(() { _params = _params.copyWith(kdjPeriod: v); }); _paramControllers['kdjPeriod']?.text = v.toString(); }
+  void _onKdjOverboughtChanged(int v) { setState(() { _params = _params.copyWith(kdjOverbought: v); }); _paramControllers['kdjOverbought']?.text = v.toString(); }
+  void _onKdjOversoldChanged(int v) { setState(() { _params = _params.copyWith(kdjOversold: v); }); _paramControllers['kdjOversold']?.text = v.toString(); }
+  void _onRsiPeriodChanged(int v) { setState(() { _params = _params.copyWith(rsiPeriod: v); }); _paramControllers['rsiPeriod']?.text = v.toString(); }
+  void _onRsiOverboughtChanged(int v) { setState(() { _params = _params.copyWith(rsiOverbought: v); }); _paramControllers['rsiOverbought']?.text = v.toString(); }
+  void _onRsiOversoldChanged(int v) { setState(() { _params = _params.copyWith(rsiOversold: v); }); _paramControllers['rsiOversold']?.text = v.toString(); }
+  void _onBollPeriodChanged(int v) { setState(() { _params = _params.copyWith(bollPeriod: v); }); _paramControllers['bollPeriod']?.text = v.toString(); }
+  void _onBollStdDevChanged(int v) { setState(() { _params = _params.copyWith(bollStdDev: v); }); _paramControllers['bollStdDev']?.text = v.toString(); }
+  void _onMaShortPeriodChanged(int v) { setState(() { _params = _params.copyWith(maShortPeriod: v); }); _paramControllers['maShortPeriod']?.text = v.toString(); }
+  void _onMaMidPeriodChanged(int v) { setState(() { _params = _params.copyWith(maMidPeriod: v); }); _paramControllers['maMidPeriod']?.text = v.toString(); }
+  void _onMaLongPeriodChanged(int v) { setState(() { _params = _params.copyWith(maLongPeriod: v); }); _paramControllers['maLongPeriod']?.text = v.toString(); }
+  void _onWrPeriodChanged(int v) { setState(() { _params = _params.copyWith(wrPeriod: v); }); _paramControllers['wrPeriod']?.text = v.toString(); }
+  void _onWrOverboughtChanged(int v) { setState(() { _params = _params.copyWith(wrOverbought: v); }); _paramControllers['wrOverbought']?.text = v.toString(); }
+  void _onWrOversoldChanged(int v) { setState(() { _params = _params.copyWith(wrOversold: v); }); _paramControllers['wrOversold']?.text = v.toString(); }
+  void _onDmiPeriodChanged(int v) { setState(() { _params = _params.copyWith(dmiPeriod: v); }); _paramControllers['dmiPeriod']?.text = v.toString(); }
+  void _onDmiAdxPeriodChanged(int v) { setState(() { _params = _params.copyWith(dmiAdxPeriod: v); }); _paramControllers['dmiAdxPeriod']?.text = v.toString(); }
+  void _onDmiTrendThresholdChanged(int v) { setState(() { _params = _params.copyWith(dmiTrendThreshold: v); }); _paramControllers['dmiTrendThreshold']?.text = v.toString(); }
 
-  Widget _buildIntParamField(String label, int value, ValueChanged<int> onChanged) {
+  Widget _buildIntParamField(String label, String key, int value, ValueChanged<int> onChanged) {
+    // B-4 Fix: 使用预创建的 controller，而非每次 build() 时 new
+    final controller = _paramControllers[key] ??= TextEditingController(text: value.toString());
     return TextField(
-      controller: TextEditingController(text: value.toString()),
+      controller: controller,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -543,6 +442,174 @@ class _BacktestPageState extends State<BacktestPage> {
       },
     );
   }
+
+  Widget _buildStrategyParamsSection() {
+    switch (_selectedStrategy) {
+      case BacktestStrategy.macd:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('MACD 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('快线周期', 'macdFastPeriod', _params.macdFastPeriod, _onMacdFastPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('慢线周期', 'macdSlowPeriod', _params.macdSlowPeriod, _onMacdSlowPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('信号周期', 'macdSignalPeriod', _params.macdSignalPeriod, _onMacdSignalPeriodChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.kdj:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('KDJ 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', 'kdjPeriod', _params.kdjPeriod, _onKdjPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超买区', 'kdjOverbought', _params.kdjOverbought, _onKdjOverboughtChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超卖区', 'kdjOversold', _params.kdjOversold, _onKdjOversoldChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.rsi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('RSI 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', 'rsiPeriod', _params.rsiPeriod, _onRsiPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超买阈值', 'rsiOverbought', _params.rsiOverbought, _onRsiOverboughtChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超卖阈值', 'rsiOversold', _params.rsiOversold, _onRsiOversoldChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.boll:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('BOLL 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', 'bollPeriod', _params.bollPeriod, _onBollPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('标准差倍数', 'bollStdDev', _params.bollStdDev, _onBollStdDevChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.ma:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('MA 均线参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('短期', 'maShortPeriod', _params.maShortPeriod, _onMaShortPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('中期', 'maMidPeriod', _params.maMidPeriod, _onMaMidPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('长期', 'maLongPeriod', _params.maLongPeriod, _onMaLongPeriodChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.wr:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('WR 威廉参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', 'wrPeriod', _params.wrPeriod, _onWrPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超买阈值', 'wrOverbought', _params.wrOverbought, _onWrOverboughtChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超卖阈值', 'wrOversold', _params.wrOversold, _onWrOversoldChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.dmi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('DMI 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('DI周期', 'dmiPeriod', _params.dmiPeriod, _onDmiPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('ADX周期', 'dmiAdxPeriod', _params.dmiAdxPeriod, _onDmiAdxPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('趋势阈值', 'dmiTrendThreshold', _params.dmiTrendThreshold, _onDmiTrendThresholdChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.multi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('综合指标参数（多策略共振）', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('MACD快', 'macdFastPeriod', _params.macdFastPeriod, _onMacdFastPeriodChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('MACD慢', 'macdSlowPeriod', _params.macdSlowPeriod, _onMacdSlowPeriodChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('MACD信', 'macdSignalPeriod', _params.macdSignalPeriod, _onMacdSignalPeriodChanged)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('RSI周期', 'rsiPeriod', _params.rsiPeriod, _onRsiPeriodChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('RSI超买', 'rsiOverbought', _params.rsiOverbought, _onRsiOverboughtChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('RSI超卖', 'rsiOversold', _params.rsiOversold, _onRsiOversoldChanged)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('KDJ周期', 'kdjPeriod', _params.kdjPeriod, _onKdjPeriodChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('KDJ超买', 'kdjOverbought', _params.kdjOverbought, _onKdjOverboughtChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('KDJ超卖', 'kdjOversold', _params.kdjOversold, _onKdjOversoldChanged)),
+              ],
+            ),
+          ],
+        );
+    }
+  }
+
+
+
+  void _updateParam(String key, int value, void Function(int) original) {
+    original(value);
+    _paramControllers[key]?.text = value.toString();
+  }
+
+
 
   Widget _buildActionRow(StockLoaded state) {
     return Row(
@@ -841,7 +908,7 @@ class _BacktestPageState extends State<BacktestPage> {
     try {
       final result = await Future(() => BacktestCalculator.runBacktest(
         filteredQuotes,
-        _selectedStrategy,
+        strategy: _selectedStrategy,
         initialCapital: initialCapital,
         feeRate: feeRate,
         positionRatio: positionRatio,
@@ -879,7 +946,7 @@ class _BacktestPageState extends State<BacktestPage> {
     final results = await Future.wait(
       _presetCombos.map((params) => Future(() => BacktestCalculator.runBacktest(
         filteredQuotes,
-        _selectedStrategy,
+        strategy: _selectedStrategy,
         initialCapital: initialCapital,
         feeRate: feeRate,
         positionRatio: positionRatio,

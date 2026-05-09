@@ -105,6 +105,30 @@ class StrategyParams {
   );
 }
 
+class BacktestConfig {
+  final double initialCapital;
+  final double feeRate;
+  final double positionRatio;
+  final StrategyParams params;
+  final double? stopLossPercent;    // 如 5.0 = 亏损5%时止损
+  final double? takeProfitPercent;   // 如 10.0 = 盈利10%时止盈
+  final bool enableTimeExit;         // 持有N天后强制退出（防震荡）
+  final int maxHoldingDays;           // 默认20
+  final double slippagePercent;       // 滑点，如 0.001 = 0.1%
+
+  const BacktestConfig({
+    this.initialCapital = 100000,
+    this.feeRate = 0.001,
+    this.positionRatio = 1.0,
+    this.params = const StrategyParams(),
+    this.stopLossPercent,
+    this.takeProfitPercent,
+    this.enableTimeExit = false,
+    this.maxHoldingDays = 20,
+    this.slippagePercent = 0.0,
+  });
+}
+
 class BacktestCalculator {
   /// 执行回测（参数化版本）
   /// [quotes] 股票数据
@@ -113,13 +137,23 @@ class BacktestCalculator {
   /// [feeRate] 手续费率（双边，一般0.0005~0.001）
   /// [positionRatio] 仓位比例（0~1）
   /// [params] 策略参数
+  /// [stopLossPercent] 止损百分比（如5.0=亏损5%止损）
+  /// [takeProfitPercent] 止盈百分比（如10.0=盈利10%止盈）
+  /// [enableTimeExit] 是否启用时间止损
+  /// [maxHoldingDays] 最大持仓天数
+  /// [slippagePercent] 滑点（如0.001=千分之一）
   static BacktestResult runBacktest(
-    List<StockQuote> quotes,
-    BacktestStrategy strategy, {
+    List<StockQuote> quotes, {
+    BacktestStrategy strategy = BacktestStrategy.macd,
     double initialCapital = 100000,
     double feeRate = 0.001,
     double positionRatio = 1.0,
     StrategyParams params = const StrategyParams(),
+    double? stopLossPercent,
+    double? takeProfitPercent,
+    bool enableTimeExit = false,
+    int maxHoldingDays = 20,
+    double slippagePercent = 0.0,
   }) {
     if (quotes.length < 30) {
       return _emptyResult(initialCapital);
@@ -130,6 +164,7 @@ class BacktestCalculator {
     double position = 0;
     double entryPrice = 0;
     String? entryDate;
+    int? entryIndex;  // 记录入场K线索引，用于时间止损计算
     bool isLong = true;
     double peakCapital = capital;
 
@@ -144,72 +179,135 @@ class BacktestCalculator {
     for (var i = 30; i < quotes.length; i++) {
       final signal = _getSignal(quotes.sublist(0, i + 1), strategy, params);
 
-      // 涨跌停限制检查
+      // 涨跌停限制检查（用于判断能否买入/卖出）
       bool canBuy = true;
       bool canSell = true;
+      double? limitUp;
+      double? limitDown;
       if (i > 30) {
         final prevClose = quotes[i - 1].close;
-        final limitUp = prevClose * 1.10;  // 涨停价（A股10%）
-        final limitDown = prevClose * 0.90;  // 跌停价
-        if (signal != null && signal['isLong'] == true && quotes[i].open >= limitUp) {
+        limitUp = prevClose * 1.10;   // 涨停价（A股10%）
+        limitDown = prevClose * 0.90;  // 跌停价
+        if (quotes[i].open >= limitUp) {
           canBuy = false;  // 涨停，买不入
         }
-        if (signal != null && signal['isLong'] == false && quotes[i].open <= limitDown) {
+        if (quotes[i].open <= limitDown) {
           canBuy = false;  // 跌停，买不入
         }
+        // 持仓时次日涨跌停：涨停可卖出（but用开盘价），跌停无法主动卖出
         if (position > 0 && quotes[i].open <= limitDown) {
-          canSell = false;  // 持仓但次日跌停
+          canSell = false;  // 跌停无法主动卖出（只能等反向信号）
         }
       }
 
-      // 入场
+      // === 入场：信号产生后，次日开盘执行（模拟真实成交）===
+      // B-2: 入场跳过涨跌停，且使用次日开盘价+滑点
       if (position == 0 && signal != null && canBuy) {
         isLong = signal['isLong'] as bool;
-        entryPrice = quotes[i].close;
+        final entryExecPrice = quotes[i].open * (1 + slippagePercent);  // 次日开盘价+滑点
+        entryPrice = entryExecPrice;
         entryDate = quotes[i].date;
+        entryIndex = i;  // 记录入场索引，用于时间止损
         final maxPosition = (capital * positionRatio) / entryPrice;
         position = maxPosition.floor().toDouble();
         totalTrades++;
       }
 
-      // 出场
-      if (position > 0 && entryDate != null && canSell) {
-        final exitPrice = quotes[i].close;
-        final profit = isLong
-            ? (exitPrice - entryPrice) * position
-            : (entryPrice - exitPrice) * position;
-        // 买入费率 + 卖出费率 + 印花税（卖出时千分之一）
-        final buyFee = entryPrice * position * feeRate;
-        final sellFee = exitPrice * position * feeRate;
-        final stampTax = exitPrice * position * 0.001;  // 印花税仅卖出收取
-        final totalFee = buyFee + sellFee + stampTax;
-        final netProfit = profit - totalFee;
-        totalProfit += netProfit;
-        capital += netProfit;
+      // === 出场顺序：止损 > 止盈 > 时间止损 > 涨跌停强平 > 反向信号 ===
+      if (position > 0 && entryDate != null) {
+        bool shouldExit = false;
+        String exitReason = TradeExitReason.reverseSignal;
 
-        trades.add(Trade(
-          entryDate: entryDate,
-          entryPrice: entryPrice,
-          exitDate: quotes[i].date,
-          exitPrice: exitPrice,
-          quantity: position.toInt(),
-          isLong: isLong,
-          profit: netProfit,
-          profitPercent: (netProfit / (entryPrice * position)) * 100,
-          holdingDays: i - quotes.indexWhere((q) => q.date == entryDate),
-          fee: totalFee,
-        ));
-
-        if (netProfit > 0) {
-          winningTrades++;
-          totalWin += netProfit;
-        } else {
-          losingTrades++;
-          totalLoss += netProfit.abs();
+        // 1. 止损检查（B-1: 用实际止损价判断，而非仅看canSell）
+        if (stopLossPercent != null && stopLossPercent > 0) {
+          final stopLossPrice = isLong
+              ? entryPrice * (1 - stopLossPercent / 100)
+              : entryPrice * (1 + stopLossPercent / 100);
+          final exitPrice = quotes[i].close;
+          if ((isLong && exitPrice <= stopLossPrice) || (!isLong && exitPrice >= stopLossPrice)) {
+            shouldExit = true;
+            exitReason = TradeExitReason.stopLoss;
+          }
         }
 
-        position = 0;
-        entryDate = null;
+        // 2. 止盈检查
+        if (!shouldExit && takeProfitPercent != null && takeProfitPercent > 0) {
+          final tpPrice = isLong
+              ? entryPrice * (1 + takeProfitPercent / 100)
+              : entryPrice * (1 - takeProfitPercent / 100);
+          final exitPrice = quotes[i].close;
+          if ((isLong && exitPrice >= tpPrice) || (!isLong && exitPrice <= tpPrice)) {
+            shouldExit = true;
+            exitReason = TradeExitReason.takeProfit;
+          }
+        }
+
+        // 3. 时间止损（防震荡）
+        if (!shouldExit && enableTimeExit && entryIndex != null) {
+          final holdingDays = i - entryIndex!;
+          if (holdingDays >= maxHoldingDays) {
+            shouldExit = true;
+            exitReason = TradeExitReason.timeExit;
+          }
+        }
+
+        // 4. 涨跌停无法卖出：次日跌停时强制以收盘价平仓
+        if (!shouldExit && !canSell) {
+          shouldExit = true;
+          exitReason = TradeExitReason.limitDown;
+        }
+
+        // 5. 反向信号出场（只有canSell=true时才执行）
+        if (!shouldExit && canSell && signal != null) {
+          final signalIsLong = signal['isLong'] as bool;
+          if (signalIsLong != isLong) {
+            shouldExit = true;
+            exitReason = TradeExitReason.reverseSignal;
+          }
+        }
+
+        if (shouldExit) {
+          final exitPrice = quotes[i].close;
+          final profit = isLong
+              ? (exitPrice - entryPrice) * position
+              : (entryPrice - exitPrice) * position;
+          // 买入费率 + 卖出费率 + 印花税（卖出时千分之一）
+          final buyFee = entryPrice * position * feeRate;
+          final sellFee = exitPrice * position * feeRate;
+          final stampTax = exitPrice * position * 0.001;  // 印花税仅卖出收取
+          final totalFee = buyFee + sellFee + stampTax;
+          final netProfit = profit - totalFee;
+          totalProfit += netProfit;
+          capital += netProfit;
+
+          final holdingDays = entryIndex != null ? i - entryIndex! : 0;
+
+          trades.add(Trade(
+            entryDate: entryDate,
+            entryPrice: entryPrice,
+            exitDate: quotes[i].date,
+            exitPrice: exitPrice,
+            quantity: position.toInt(),
+            isLong: isLong,
+            profit: netProfit,
+            profitPercent: (netProfit / (entryPrice * position)) * 100,
+            holdingDays: holdingDays,
+            fee: totalFee,
+            exitReason: exitReason,
+          ));
+
+          if (netProfit > 0) {
+            winningTrades++;
+            totalWin += netProfit;
+          } else {
+            losingTrades++;
+            totalLoss += netProfit.abs();
+          }
+
+          position = 0;
+          entryDate = null;
+          entryIndex = null;
+        }
       }
 
       // 更新最大回撤（使用百分比计算）
@@ -224,6 +322,7 @@ class BacktestCalculator {
     final profitFactor = totalLoss > 0 ? totalWin / totalLoss : totalWin > 0 ? double.infinity : 0.0;
     final sharpeRatio = _calculateSharpeRatio(trades);
     final kellyPercent = winRate > 0 ? winRate - (100 - winRate) / (profitFactor > 0 ? profitFactor : 1) : 0;
+    final kellyCapped = kellyPercent < 0 ? 0.0 : kellyPercent; // B-6: Kelly不能为负
 
     return BacktestResult(
       totalTrades: totalTrades.toInt(),
@@ -234,8 +333,8 @@ class BacktestCalculator {
       maxDrawdown: maxDrawdown.toDouble(),  // 已经是百分比
       maxDrawdownPercent: maxDrawdown.toDouble(),
       sharpeRatio: sharpeRatio.toDouble(),
-      kellyPercent: kellyPercent.toDouble(),
-      kellyFraction: kellyPercent > 0 ? '${(kellyPercent / 2).toStringAsFixed(1)}%' : '0%',
+      kellyPercent: kellyCapped.toDouble(),
+      kellyFraction: kellyCapped > 0 ? '${(kellyCapped / 2).toStringAsFixed(1)}%' : '0%',
       avgWin: avgWin.toDouble(),
       avgLoss: avgLoss.toDouble(),
       profitFactor: profitFactor.isFinite ? profitFactor : 0.0,
