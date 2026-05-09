@@ -130,7 +130,9 @@ class TurtleTradingCalculator {
         }
 
         if (shouldExit) {
-          final quantity = ((capital * (riskPercent / 100)) / (atr * stopLossN)).floor().toDouble();
+          final quantity = atrAtEntry! > 0
+              ? ((capital * (riskPercent / 100)) / (atrAtEntry! * stopLossN)).floor().toDouble()
+              : 0.0;
           final grossProfit = isLong!
               ? (price - entryPrice!) * quantity
               : (entryPrice! - price) * quantity;
