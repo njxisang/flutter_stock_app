@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,6 +19,11 @@ class _TurtleTradingPageState extends State<TurtleTradingPage> {
   double _riskPercent = 1.0;
   int _period = 20;
 
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 365));
+  DateTime _endDate = DateTime.now();
+  final _dateFormat = DateFormat('yyyy-MM-dd');
+  bool _isLoadingData = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,8 +42,14 @@ class _TurtleTradingPageState extends State<TurtleTradingPage> {
             return const Center(child: Text('请先加载股票数据'));
           }
 
+          // 按所选日期过滤数据
+          final filteredQuotes = state.stockData.quotes.where((q) {
+            final d = DateTime.parse(q.date);
+            return !d.isBefore(_startDate) && !d.isAfter(_endDate);
+          }).toList();
+
           final details = TurtleTradingCalculator.calculate(
-            state.stockData.quotes,
+            filteredQuotes.isNotEmpty ? filteredQuotes : state.stockData.quotes,
             period: _period,
             accountBalance: _accountBalance,
             riskPercent: _riskPercent,
@@ -89,6 +101,45 @@ class _TurtleTradingPageState extends State<TurtleTradingPage> {
                             ],
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Date range selector
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: Text(_dateFormat.format(_startDate)),
+                            onPressed: () => _selectDate(true),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('至', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: Text(_dateFormat.format(_endDate)),
+                            onPressed: () => _selectDate(false),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_isLoadingData)
+                          const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                        else
+                          IconButton(
+                            icon: const Icon(Icons.refresh, size: 20),
+                            onPressed: () => _ensureDataForRange(state),
+                            tooltip: '补全该时间段数据',
+                          ),
                       ],
                     ),
                   ),
@@ -345,5 +396,78 @@ class _TurtleTradingPageState extends State<TurtleTradingPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _selectDate(bool isStart) async {
+    final initial = isStart ? _startDate : _endDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        if (picked.isAfter(_endDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('开始日期不能晚于结束日期')),
+          );
+          return;
+        }
+        _startDate = picked;
+      } else {
+        if (picked.isBefore(_startDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('结束日期不能早于开始日期')),
+          );
+          return;
+        }
+        _endDate = picked;
+      }
+    });
+  }
+
+  Future<void> _ensureDataForRange(StockLoaded state) async {
+    setState(() => _isLoadingData = true);
+
+    final existingQuotes = state.stockData.quotes;
+    DateTime? existingStart;
+    DateTime? existingEnd;
+
+    if (existingQuotes.isNotEmpty) {
+      existingStart = DateTime.parse(existingQuotes.first.date);
+      existingEnd = DateTime.parse(existingQuotes.last.date);
+    }
+
+    bool needFetch = existingQuotes.isEmpty;
+    String start = _dateFormat.format(_startDate);
+    String end = _dateFormat.format(_endDate);
+
+    if (!needFetch && existingStart != null && _startDate.isBefore(existingStart)) {
+      needFetch = true;
+    }
+    if (!needFetch && existingEnd != null && _endDate.isAfter(existingEnd)) {
+      needFetch = true;
+    }
+
+    if (needFetch) {
+      if (mounted) {
+        context.read<StockBloc>().add(LoadStock(
+          state.stockData.symbol,
+          startDate: start,
+          endDate: end,
+        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('正在拉取 $start ~ $end 数据...')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('数据已覆盖所选时间段')),
+      );
+    }
+
+    setState(() => _isLoadingData = false);
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -21,6 +22,12 @@ class _BacktestPageState extends State<BacktestPage> {
   final _positionRatioController = TextEditingController(text: '1.0');
   BacktestResult? _result;
   bool _isRunning = false;
+  bool _isLoadingData = false;
+
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 365));
+  DateTime _endDate = DateTime.now();
+
+  final _dateFormat = DateFormat('yyyy-MM-dd');
 
   final _strategyDescriptions = {
     BacktestStrategy.macd: 'MACD金叉买入，死叉卖出',
@@ -76,18 +83,55 @@ class _BacktestPageState extends State<BacktestPage> {
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(state.stockData.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(state.stockData.symbol, style: const TextStyle(color: AppColors.textSecondary)),
-                            ],
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(state.stockData.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                  Text(state.stockData.symbol, style: const TextStyle(color: AppColors.textSecondary)),
+                                ],
+                              ),
+                            ),
+                            Text('${state.stockData.quotes.length}个数据点'),
+                          ],
                         ),
-                        Text('${state.stockData.quotes.length}个数据点'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.calendar_today, size: 16),
+                                label: Text(_dateFormat.format(_startDate)),
+                                onPressed: () => _selectDate(true),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Text('至', style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.calendar_today, size: 16),
+                                label: Text(_dateFormat.format(_endDate)),
+                                onPressed: () => _selectDate(false),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (_isLoadingData)
+                              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.refresh, size: 20),
+                                onPressed: () => _ensureDataForRange(state),
+                                tooltip: '补全该时间段数据',
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -185,7 +229,7 @@ class _BacktestPageState extends State<BacktestPage> {
                 // Collapsed params summary when result is shown
                 if (_result != null) ...[
                   ExpansionTile(
-                    title: Text('策略: ${_getStrategyName(_selectedStrategy)} | 初始: ${_initialCapitalController.text} | 费率: ${_feeRateController.text}',
+                    title: Text('策略: ${_getStrategyName(_selectedStrategy)} | 初始: ${_initialCapitalController.text} | ${_dateFormat.format(_startDate)}~${_dateFormat.format(_endDate)}',
                       style: const TextStyle(fontSize: 12)),
                     tilePadding: EdgeInsets.zero,
                     childrenPadding: EdgeInsets.zero,
@@ -226,9 +270,26 @@ class _BacktestPageState extends State<BacktestPage> {
     final feeRate = double.tryParse(_feeRateController.text) ?? 0.001;
     final positionRatio = double.tryParse(_positionRatioController.text) ?? 1.0;
 
+    // 按所选日期过滤数据
+    final filteredQuotes = state.stockData.quotes.where((q) {
+      final d = DateTime.parse(q.date);
+      return !d.isBefore(_startDate) && !d.isAfter(_endDate);
+    }).toList();
+
+    if (filteredQuotes.isEmpty) {
+      if (mounted) {
+        setState(() => _isRunning = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('所选时间段内无数据，请先补全数据')),
+        );
+        _ensureDataForRange(state);
+      }
+      return;
+    }
+
     try {
       final result = await Future(() => BacktestCalculator.runBacktest(
-        state.stockData.quotes,
+        filteredQuotes,
         _selectedStrategy,
         initialCapital: initialCapital,
         feeRate: feeRate,
@@ -250,6 +311,83 @@ class _BacktestPageState extends State<BacktestPage> {
         );
       }
     }
+  }
+
+  Future<void> _selectDate(bool isStart) async {
+    final initial = isStart ? _startDate : _endDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        if (picked.isAfter(_endDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('开始日期不能晚于结束日期')),
+          );
+          return;
+        }
+        _startDate = picked;
+      } else {
+        if (picked.isBefore(_startDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('结束日期不能早于开始日期')),
+          );
+          return;
+        }
+        _endDate = picked;
+      }
+    });
+    _result = null; // 日期变了清除上次结果
+  }
+
+  Future<void> _ensureDataForRange(StockLoaded state) async {
+    setState(() => _isLoadingData = true);
+
+    // 检查现有数据是否覆盖所选时间段
+    final existingQuotes = state.stockData.quotes;
+    DateTime? existingStart;
+    DateTime? existingEnd;
+
+    if (existingQuotes.isNotEmpty) {
+      existingStart = DateTime.parse(existingQuotes.first.date);
+      existingEnd = DateTime.parse(existingQuotes.last.date);
+    }
+
+    bool needFetch = existingQuotes.isEmpty;
+    String start = _dateFormat.format(_startDate);
+    String end = _dateFormat.format(_endDate);
+
+    // 如果起始日期比现有数据更早，需要补
+    if (!needFetch && existingStart != null && _startDate.isBefore(existingStart)) {
+      needFetch = true;
+    }
+    // 如果结束日期比现有数据更晚，需要补
+    if (!needFetch && existingEnd != null && _endDate.isAfter(existingEnd)) {
+      needFetch = true;
+    }
+
+    if (needFetch) {
+      if (mounted) {
+        context.read<StockBloc>().add(LoadStock(
+          state.stockData.symbol,
+          startDate: start,
+          endDate: end,
+        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('正在拉取 $start ~ $end 数据...')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('数据已覆盖所选时间段，直接回测')),
+      );
+    }
+
+    setState(() => _isLoadingData = false);
   }
 
   Widget _buildResultCard() {
