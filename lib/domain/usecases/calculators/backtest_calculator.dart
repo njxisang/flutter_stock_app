@@ -250,7 +250,8 @@ class BacktestCalculator {
     bool isLong = true;
     double peakCapital = capital;
     // ─── U-4: 资金曲线 ───
-    final capitalHistory = <double>[capital]; // 第0天（入场前）的资金
+    final capitalHistory = <double>[capital];      // 第0天（入场前）的资金
+    final capitalHistoryDates = <String>[quotes.isNotEmpty ? quotes[30].date : ''];
 
     double totalTrades = 0;
     double winningTrades = 0;
@@ -398,8 +399,9 @@ class BacktestCalculator {
       if (capital > peakCapital) peakCapital = capital;
       final drawdownPercent = peakCapital > 0 ? (peakCapital - capital) / peakCapital * 100 : 0.0;
       if (drawdownPercent > maxDrawdown) maxDrawdown = drawdownPercent;
-      // ─── U-4: 记录每日资金 ───
+      // ─── U-4: 记录每日资金和日期 ───
       capitalHistory.add(capital);
+      capitalHistoryDates.add(quotes[i].date);
     }
 
     final winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
@@ -425,8 +427,10 @@ class BacktestCalculator {
       avgLoss: avgLoss.toDouble(),
       profitFactor: profitFactor.isFinite ? profitFactor : 0.0,
       trades: trades,
-      initialCapital: initialCapital.toDouble(),
-      finalCapital: capital.toDouble(),
+      initialCapital: initialCapital,
+      finalCapital: capital,
+      capitalHistory: capitalHistory,
+      capitalHistoryDates: capitalHistoryDates,
     );
   }
 
@@ -950,6 +954,7 @@ class BacktestCalculator {
       initialCapital: initialCapital,
       finalCapital: initialCapital,
       capitalHistory: const [],
+      capitalHistoryDates: const [],
     );
   }
 }

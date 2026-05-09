@@ -25,6 +25,8 @@ dependencies:
   # Local Storage
   shared_preferences: ^2.2.2
   share_plus: ^7.2.1
+  pdf: ^3.10.4
+  printing: ^5.11.1
 
   # Dependency Injection
   get_it: ^7.6.4

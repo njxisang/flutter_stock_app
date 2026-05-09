@@ -1,6 +1,10 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_constants.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -176,6 +180,128 @@ class _BacktestPageState extends State<BacktestPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('导出失败: $e')));
       }
     }
+  }
+
+  // ─── U-3: 导出PDF报告 ───
+  Future<void> _exportPdf(BacktestResult r) async {
+    try {
+      final pdf = pw.Document();
+      final dateStr = '${_dateFormat.format(_startDate)} ~ ${_dateFormat.format(_endDate)}';
+      final returnPct = (r.totalProfit / r.initialCapital * 100).toStringAsFixed(2);
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          header: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('回测报告', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 4),
+              pw.Text('策略: ${_selectedStrategy.name}  |  回测区间: $dateStr',
+                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+              pw.Divider(),
+              pw.SizedBox(height: 8),
+            ],
+          ),
+          build: (ctx) => [
+            // 收益概览
+            pw.Text('收益概览', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            _pdfTable([
+              ['初始资金', '最终资金', '总收益', '收益率', '胜率'],
+              [r.initialCapital.toStringAsFixed(2), r.finalCapital.toStringAsFixed(2),
+               '${r.totalProfit >= 0 ? '+' : ''}${r.totalProfit.toStringAsFixed(2)}',
+               '$returnPct%', '${r.winRate.toStringAsFixed(1)}%'],
+            ]),
+            pw.SizedBox(height: 16),
+
+            // 关键指标
+            pw.Text('关键指标', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            _pdfTable([
+              ['夏普比率', 'Kelly仓位', '盈亏比', '最大回撤', '交易次数'],
+              [r.sharpeRatio.toStringAsFixed(2), r.kellyFraction,
+               r.profitFactor > 0 ? r.profitFactor.toStringAsFixed(2) : 'N/A',
+               '${r.maxDrawdownPercent.toStringAsFixed(2)}%', '${r.totalTrades}'],
+            ]),
+            pw.SizedBox(height: 16),
+
+            // 交易明细
+            if (r.trades.isNotEmpty) ...[
+              pw.Text('交易明细', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              _pdfTradeTable(r.trades),
+            ],
+          ],
+        ),
+      );
+
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: '回测报告_${_selectedStrategy.name}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF导出失败: $e')));
+      }
+    }
+  }
+
+  pw.Widget _pdfTable(List<List<String>> rows) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      children: rows.asMap().entries.map((entry) {
+        final isHeader = entry.key == 0;
+        return pw.TableRow(
+          decoration: isHeader ? const pw.BoxDecoration(color: PdfColors.grey200) : null,
+          children: entry.value.map((cell) {
+            return pw.Padding(
+              padding: const pw.EdgeInsets.all(5),
+              child: pw.Text(cell, style: pw.TextStyle(
+                fontSize: isHeader ? 9 : 9,
+                fontWeight: isHeader ? pw.FontWeight.bold : null,
+              )),
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
+  }
+
+  pw.Widget _pdfTradeTable(List<Trade> trades) {
+    return pw.Table(
+      columnWidths: {
+        0: const pw.FlexColumnWidth(2),
+        1: const pw.FlexColumnWidth(1.5),
+        2: const pw.FlexColumnWidth(2),
+        3: const pw.FlexColumnWidth(1.5),
+        4: const pw.FlexColumnWidth(1),
+        5: const pw.FlexColumnWidth(1.5),
+        6: const pw.FlexColumnWidth(1.5),
+        7: const pw.FlexColumnWidth(2),
+      },
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: ['入场日期','入场价','出场日期','出场价','方向','持仓','盈亏','出场原因']
+              .map((h) => pw.Padding(padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(h, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))))
+              .toList(),
+        ),
+        ...trades.take(50).map((t) => pw.TableRow(children: [
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(t.entryDate, style: const pw.TextStyle(fontSize: 8))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(t.entryPrice.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 8))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(t.exitDate, style: const pw.TextStyle(fontSize: 8))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(t.exitPrice.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 8))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(t.isLong ? '多' : '空', style: const pw.TextStyle(fontSize: 8))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${t.holdingDays}天', style: const pw.TextStyle(fontSize: 8))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text('${t.profit >= 0 ? '+' : ''}${t.profit.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: t.profit >= 0 ? PdfColors.green : PdfColors.red))),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(t.exitReason ?? '', style: const pw.TextStyle(fontSize: 8))),
+        ])),
+      ],
+    );
   }
 
   void _initParamControllers() {
@@ -1040,7 +1166,11 @@ class _BacktestPageState extends State<BacktestPage> {
             // ─── U-2: 导出CSV按钮 ───
             Row(
               children: [
-                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.picture_as_pdf, size: 16),
+                  label: const Text('PDF报告'),
+                  onPressed: () => _exportPdf(r),
+                ),
                 TextButton.icon(
                   icon: const Icon(Icons.download, size: 16),
                   label: const Text('导出CSV'),
@@ -1079,6 +1209,8 @@ class _BacktestPageState extends State<BacktestPage> {
             _buildRow('亏损次数', '${r.losingTrades}'),
             _buildRow('初始资金', r.initialCapital.toStringAsFixed(2)),
             _buildRow('最终资金', r.finalCapital.toStringAsFixed(2)),
+            // ─── U-4: 资金曲线 ───
+            _buildCapitalCurveChart(r),
             // 交易记录（U-7 筛选器）
             if (r.trades.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -1114,6 +1246,114 @@ class _BacktestPageState extends State<BacktestPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // ─── U-4: 资金曲线图表 ───
+  Widget _buildCapitalCurveChart(BacktestResult r) {
+    if (r.capitalHistory.length < 2) return const SizedBox.shrink();
+
+    final spots = <FlSpot>[];
+    for (var i = 0; i < r.capitalHistory.length; i++) {
+      spots.add(FlSpot(i.toDouble(), r.capitalHistory[i]));
+    }
+
+    // 取 capitalHistoryDates 的首尾（最多5个标签）
+    final dates = r.capitalHistoryDates;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        const Text('资金曲线', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 120,
+          child: LineChart(
+            LineChartData(
+              backgroundColor: AppColors.chartBackground,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (value) => FlLine(color: AppColors.gridLine, strokeWidth: 0.5),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 50,
+                    getTitlesWidget: (value, meta) {
+                      if (value == r.initialCapital) {
+                        return Text('本金', style: TextStyle(fontSize: 8, color: AppColors.textSecondary));
+                      }
+                      return Text(
+                        '${(value / 10000).toStringAsFixed(0)}w',
+                        style: const TextStyle(fontSize: 8, color: AppColors.axisLabel),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 20,
+                    interval: dates.length >= 5 ? (dates.length / 4).roundToDouble() : null,
+                    getTitlesWidget: (value, meta) {
+                      final idx = value.toInt();
+                      if (idx >= 0 && idx < dates.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(dates[idx].substring(5), style: const TextStyle(fontSize: 8, color: AppColors.axisLabel)),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  color: AppColors.primary,
+                  barWidth: 1.5,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: AppColors.primary.withAlpha(15),
+                  ),
+                ),
+              ],
+              extraLinesData: ExtraLinesData(
+                horizontalLines: [
+                  HorizontalLine(
+                    y: r.initialCapital,
+                    color: AppColors.gridLineStrong,
+                    strokeWidth: 0.8,
+                    dashArray: [4, 4],
+                  ),
+                ],
+              ),
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipItems: (touchedSpots) {
+                    return touchedSpots.map((spot) {
+                      final idx = spot.spotIndex;
+                      final date = idx < dates.length ? dates[idx] : '';
+                      return LineTooltipItem(
+                        '$date\n${spot.y.toStringAsFixed(0)}',
+                        const TextStyle(color: Colors.white, fontSize: 11),
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
