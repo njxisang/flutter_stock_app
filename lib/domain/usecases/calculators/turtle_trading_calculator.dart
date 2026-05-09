@@ -5,7 +5,7 @@ class TurtleTradingCalculator {
   /// 计算海龟交易信号
   /// [quotes] 股票数据
   /// [period] N值计算周期，默认20
-  static TurtleDetails calculate(List<StockQuote> quotes, {int period = 20, double accountBalance = 100000}) {
+  static TurtleDetails calculate(List<StockQuote> quotes, {int period = 20, double accountBalance = 100000, double riskPercent = 1.0}) {
     if (quotes.length < period) {
       return _emptyDetails();
     }
@@ -80,7 +80,7 @@ class TurtleTradingCalculator {
       explanation = '价格跌破20日低点($low20)，做空信号';
       entryPrice = low20;
       steps = [
-        '1. 入场：卖出价 = 跌破20日低点 $low10',
+        '1. 入场：卖出价 = 跌破20日低点 $low20',
         '2. 止损：卖出价 + 2N = ${(low20 + 2 * atr).toStringAsFixed(2)}',
         '3. 止盈：2倍风险收益',
         '4. 仓位：每份风险 = 账户1% / N值',
@@ -92,22 +92,21 @@ class TurtleTradingCalculator {
       steps = ['当前无信号，等待价格突破20日高点或跌破20日低点'];
     }
 
-    // 计算仓位大小（每份风险 = 账户1%）
-    final riskAmount = accountBalance * 0.01;
+    // 计算仓位大小（每份风险 = 账户riskPercent%）
+    final riskAmount = accountBalance * (riskPercent / 100);
     final positionSize = atr > 0 ? riskAmount / atr : 0.0;
 
-    // 计算止损和止盈
-    final stopLoss = signal == TurtleSignalType.longBreakout
-        ? currentPrice - 2 * atr
-        : signal == TurtleSignalType.shortBreakout
-            ? currentPrice + 2 * atr
-            : 0.0;
-
-    final takeProfit = signal == TurtleSignalType.longBreakout
-        ? currentPrice + 4 * atr
-        : signal == TurtleSignalType.shortBreakout
-            ? currentPrice - 4 * atr
-            : 0.0;
+    // 计算止损和止盈（基于入场价，而非当前价）
+    // 海龟规则：止损 = 入场价 ± 2N，止盈 = 入场价 ± 4N（或2倍风险收益）
+    double stopLoss = 0.0;
+    double takeProfit = 0.0;
+    if (signal == TurtleSignalType.longBreakout) {
+      stopLoss = entryPrice - 2 * atr;
+      takeProfit = entryPrice + 4 * atr; // 4N = 2倍风险收益（止损2N）
+    } else if (signal == TurtleSignalType.shortBreakout) {
+      stopLoss = entryPrice + 2 * atr;
+      takeProfit = entryPrice - 4 * atr;
+    }
 
     final riskReward = stopLoss != 0 ? ((currentPrice - stopLoss) / atr).abs() : 0.0;
 

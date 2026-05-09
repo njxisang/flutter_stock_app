@@ -6,13 +6,30 @@ import '../../domain/usecases/calculators/turtle_trading_calculator.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../blocs/stock/stock_bloc.dart';
 
-class TurtleTradingPage extends StatelessWidget {
+class TurtleTradingPage extends StatefulWidget {
   const TurtleTradingPage({super.key});
+
+  @override
+  State<TurtleTradingPage> createState() => _TurtleTradingPageState();
+}
+
+class _TurtleTradingPageState extends State<TurtleTradingPage> {
+  double _accountBalance = 100000;
+  double _riskPercent = 1.0;
+  int _period = 20;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('海龟交易')),
+      appBar: AppBar(
+        title: const Text('海龟交易'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showSettingsSheet,
+          ),
+        ],
+      ),
       body: BlocBuilder<StockBloc, StockState>(
         builder: (context, state) {
           if (state is! StockLoaded) {
@@ -21,7 +38,9 @@ class TurtleTradingPage extends StatelessWidget {
 
           final details = TurtleTradingCalculator.calculate(
             state.stockData.quotes,
-            accountBalance: 100000,
+            period: _period,
+            accountBalance: _accountBalance,
+            riskPercent: _riskPercent,
           );
 
           final signalColor = details.signal == TurtleSignalType.longBreakout
@@ -242,6 +261,89 @@ class TurtleTradingPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('海龟参数设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                _buildSliderTile('账户资金', _accountBalance, 10000, 1000000, (v) {
+                  setSheetState(() => _accountBalance = v.roundToDouble());
+                  setState(() {});
+                }, suffix: '元'),
+                const SizedBox(height: 8),
+                _buildSliderTile('每份风险比例', _riskPercent, 0.1, 5.0, (v) {
+                  setSheetState(() => _riskPercent = double.parse(v.toStringAsFixed(1)));
+                  setState(() {});
+                }, suffix: '%'),
+                const SizedBox(height: 8),
+                _buildSliderTile('N值周期', _period.toDouble(), 10, 60, (v) {
+                  setSheetState(() => _period = v.round());
+                  setState(() {});
+                }, suffix: '日', divisions: 50),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('应用'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSliderTile(String label, double value, double min, double max, ValueChanged<double> onChanged, {String suffix = '', int? divisions}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 14)),
+            Text('${label == 'N值周期' ? value.round() : value.toStringAsFixed(label == '账户资金' ? 0 : 1)}$suffix',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions ?? ((max - min) ~/ (label == '账户资金' ? 1000 : 0.1)),
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }
