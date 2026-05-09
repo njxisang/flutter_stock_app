@@ -3,7 +3,7 @@ import 'package:flutter_stock_app/domain/entities/stock_quote.dart';
 import 'package:flutter_stock_app/domain/usecases/calculators/kdj_calculator.dart';
 import 'package:flutter_stock_app/domain/usecases/calculators/rsi_calculator.dart';
 
-enum BacktestStrategy { macd, kdj, rsi, boll, ma, wr, dmi, multi }
+enum BacktestStrategy { macd, kdj, rsi, boll, ma, wr, dmi, multi, cci, stochRsi }
 
 /// 策略参数配置（所有策略通用结构）
 class StrategyParams {
@@ -43,6 +43,18 @@ class StrategyParams {
   final int dmiAdxPeriod;      // 默认14（ADX自身平滑周期）
   final int dmiTrendThreshold; // 默认25（ADX>此值认为有趋势）
 
+  // ─── CCI参数 ───
+  final int cciPeriod;         // 默认14
+
+  // ─── StochRSI参数 ───
+  final int stochRsiPeriod;   // 默认14
+  final int stochRsiKPeriod;  // 默认3
+  final int stochRsiDPeriod;  // 默认3
+
+  // ─── MA + Volume 参数 ───
+  final int volumeMAperiod;   // 均量周期，默认5
+  final bool volumeFilter;    // 是否启用放量过滤，默认false
+
   const StrategyParams({
     this.macdFastPeriod = 12,
     this.macdSlowPeriod = 26,
@@ -66,6 +78,12 @@ class StrategyParams {
     this.dmiPeriod = 14,
     this.dmiAdxPeriod = 14,
     this.dmiTrendThreshold = 25,
+    this.cciPeriod = 14,
+    this.stochRsiPeriod = 14,
+    this.stochRsiKPeriod = 3,
+    this.stochRsiDPeriod = 3,
+    this.volumeMAperiod = 5,
+    this.volumeFilter = false,
   });
 
   /// 默认参数工厂
@@ -79,6 +97,9 @@ class StrategyParams {
     int? maShortPeriod, int? maMidPeriod, int? maLongPeriod,
     int? wrPeriod, int? wrOverbought, int? wrOversold,
     int? dmiPeriod, int? dmiAdxPeriod, int? dmiTrendThreshold,
+    int? cciPeriod,
+    int? stochRsiPeriod, int? stochRsiKPeriod, int? stochRsiDPeriod,
+    int? volumeMAperiod, bool? volumeFilter,
   }) => StrategyParams(
     macdFastPeriod: macdFastPeriod ?? this.macdFastPeriod,
     macdSlowPeriod: macdSlowPeriod ?? this.macdSlowPeriod,
@@ -102,6 +123,12 @@ class StrategyParams {
     dmiPeriod: dmiPeriod ?? this.dmiPeriod,
     dmiAdxPeriod: dmiAdxPeriod ?? this.dmiAdxPeriod,
     dmiTrendThreshold: dmiTrendThreshold ?? this.dmiTrendThreshold,
+    cciPeriod: cciPeriod ?? this.cciPeriod,
+    stochRsiPeriod: stochRsiPeriod ?? this.stochRsiPeriod,
+    stochRsiKPeriod: stochRsiKPeriod ?? this.stochRsiKPeriod,
+    stochRsiDPeriod: stochRsiDPeriod ?? this.stochRsiDPeriod,
+    volumeMAperiod: volumeMAperiod ?? this.volumeMAperiod,
+    volumeFilter: volumeFilter ?? this.volumeFilter,
   );
 }
 
@@ -362,6 +389,10 @@ class BacktestCalculator {
         return _dmiSignal(quotes, params);
       case BacktestStrategy.multi:
         return _multiSignal(quotes, params);
+      case BacktestStrategy.cci:
+        return _cciSignal(quotes, params);
+      case BacktestStrategy.stochRsi:
+        return _stochRsiSignal(quotes, params);
     }
   }
 
@@ -516,9 +547,28 @@ class BacktestCalculator {
     final prevMaL = calcPrevMa(l);
 
     // 金叉：空头(短<=中) → 多头(短>中>长)，且之前中<长
-    if (prevMaS <= prevMaM && maS > maM && maM > maL && prevMaM <= prevMaL) return {'isLong': true};
+    if (prevMaS <= prevMaM && maS > maM && maM > maL && prevMaM <= prevMaL) {
+      // 量价共振：放量（当日成交量 > 均量 × 1.5）
+      if (params.volumeFilter) {
+        final vol = quotes.last.volume;
+        double volSum = 0;
+        for (var i = 0; i < params.volumeMAperiod; i++) volSum += quotes[quotes.length - 1 - i].volume;
+        final volMa = volSum / params.volumeMAperiod;
+        if (vol < volMa * 1.5) return null;  // 缩量，不确认
+      }
+      return {'isLong': true};
+    }
     // 死叉：多头(短>=中) → 空头(短<中<长)，且之前中>长
-    if (prevMaS >= prevMaM && maS < maM && maM < maL && prevMaM >= prevMaL) return {'isLong': false};
+    if (prevMaS >= prevMaM && maS < maM && maM < maL && prevMaM >= prevMaL) {
+      if (params.volumeFilter) {
+        final vol = quotes.last.volume;
+        double volSum = 0;
+        for (var i = 0; i < params.volumeMAperiod; i++) volSum += quotes[quotes.length - 1 - i].volume;
+        final volMa = volSum / params.volumeMAperiod;
+        if (vol < volMa * 1.5) return null;
+      }
+      return {'isLong': false};
+    }
     return null;
   }
 
@@ -656,6 +706,141 @@ class BacktestCalculator {
 
     if (longCount >= 2) return {'isLong': true};
     if (shortCount >= 2) return {'isLong': false};
+    return null;
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  CCI 信号（顺势指标）
+  //  CCI 从 -100 以下上穿 → 做多
+  //  CCI 从 +100 以上下穿 → 做空
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _cciSignal(List<StockQuote> quotes, StrategyParams params) {
+    final n = params.cciPeriod;
+    if (quotes.length < n + 1) return null;
+
+    // 计算典型价格 TP = (High + Low + Close) / 3
+    // CCI = (TP - MA(TP)) / (0.015 × 平均绝对偏差)
+    final tpList = quotes.map((q) => (q.high + q.low + q.close) / 3.0).toList();
+
+    // 计算 MA(TP)
+    double calcMa(List<double> arr, int len) {
+      double sum = 0;
+      for (var i = 0; i < len; i++) sum += arr[arr.length - 1 - i];
+      return sum / len;
+    }
+
+    final currentTp = tpList.last;
+    final prevTp = tpList[tpList.length - 2];
+
+    // MA of TP for current and previous
+    final maCurrent = calcMa(tpList, n);
+    final maPrev = calcMa(tpList.sublist(0, tpList.length - 1), n);
+
+    // 计算平均绝对偏差
+    double calcMad(List<double> arr, int len, double ma) {
+      double sum = 0;
+      for (var i = 0; i < len; i++) sum += (arr[arr.length - 1 - i] - ma).abs();
+      return sum / len;
+    }
+
+    final madCurrent = calcMad(tpList, n, maCurrent);
+    final madPrev = calcMad(tpList.sublist(0, tpList.length - 1), n, maPrev);
+
+    // CCI = (TP - MA) / (0.015 × MAD)
+    double calcCci(double tp, double ma, double mad) {
+      if (mad == 0) return 0;
+      return (tp - ma) / (0.015 * mad);
+    }
+
+    final cciCurrent = calcCci(currentTp, maCurrent, madCurrent);
+    final cciPrev = calcCci(prevTp, maPrev, madPrev);
+
+    // CCI 从 -100 以下上穿 → 做多
+    if (cciPrev <= -100 && cciCurrent > -100) return {'isLong': true};
+    // CCI 从 +100 以上下穿 → 做空
+    if (cciPrev >= 100 && cciCurrent < 100) return {'isLong': false};
+    return null;
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  StochRSI 信号（RSI 的 RSI，增强信号灵敏度）
+  //  StochRSI = (RSI - minRSI) / (maxRSI - minRSI) × 100
+  //  K = SMA(StochRSI, KPeriod)，D = SMA(K, DPeriod)
+  //  金叉（K上穿D）在超卖区 → 做多；死叉（K下穿D）在超买区 → 做空
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _stochRsiSignal(List<StockQuote> quotes, StrategyParams params) {
+    final rsiPeriod = params.rsiPeriod > 0 ? params.rsiPeriod : 14;
+    final kPeriod = params.stochRsiKPeriod;
+    final dPeriod = params.stochRsiDPeriod;
+    final stoRsiPeriod = params.stochRsiPeriod;
+
+    if (quotes.length < rsiPeriod + stoRsiPeriod + kPeriod + dPeriod) return null;
+
+    // 先计算 RSI 系列
+    final rsiData = RsiCalculator.calculate(quotes, period: rsiPeriod);
+    if (rsiData.length < stoRsiPeriod + 1) return null;
+
+    // 取最近 stoRsiPeriod 个 RSI 值
+    final rsiValues = rsiData.map((r) => r.rsi).toList();
+
+    // 计算 StochRSI：StochRSI[i] = (RSI[i] - min(RSI_lastN)) / (max(RSI_lastN) - min(RSI_lastN)) * 100
+    final stoRsiValues = <double>[];
+    for (var i = stoRsiPeriod - 1; i < rsiValues.length; i++) {
+      final window = rsiValues.sublist(i - stoRsiPeriod + 1, i + 1);
+      final minRsi = window.reduce((a, b) => a < b ? a : b);
+      final maxRsi = window.reduce((a, b) => a > b ? a : b);
+      if (maxRsi == minRsi) {
+        stoRsiValues.add(50);
+      } else {
+        stoRsiValues.add((rsiValues[i] - minRsi) / (maxRsi - minRsi) * 100);
+      }
+    }
+
+    if (stoRsiValues.length < kPeriod + 1) return null;
+
+    // 计算 K = SMA(StochRSI, KPeriod)
+    double sma(List<double> arr, int len) {
+      double sum = 0;
+      for (var i = arr.length - len; i < arr.length; i++) sum += arr[i];
+      return sum / len;
+    }
+
+    double smaAt(List<double> arr, int endIdx, int len) {
+      double sum = 0;
+      for (var i = endIdx - len + 1; i <= endIdx; i++) sum += arr[i];
+      return sum / len;
+    }
+
+    final kValues = <double>[];
+    for (var i = kPeriod - 1; i < stoRsiValues.length; i++) {
+      final window = stoRsiValues.sublist(i - kPeriod + 1, i + 1);
+      kValues.add(window.reduce((a, b) => a + b) / kPeriod);
+    }
+
+    if (kValues.length < dPeriod + 1) return null;
+
+    // 计算 D = SMA(K, DPeriod)
+    final dValues = <double>[];
+    for (var i = dPeriod - 1; i < kValues.length; i++) {
+      final window = kValues.sublist(i - dPeriod + 1, i + 1);
+      dValues.add(window.reduce((a, b) => a + b) / dPeriod);
+    }
+
+    if (dValues.length < 2) return null;
+
+    final kCurr = kValues[kValues.length - 1];
+    final kPrev = kValues[kValues.length - 2];
+    final dCurr = dValues[dValues.length - 1];
+    final dPrev = dValues[dValues.length - 2];
+
+    // 20 以下为超卖区，80 以上为超买区
+    final oversoldThreshold = 20.0;
+    final overboughtThreshold = 80.0;
+
+    // 金叉在超卖区 → 做多
+    if (kPrev <= dPrev && kCurr > dCurr && kCurr < oversoldThreshold) return {'isLong': true};
+    // 死叉在超买区 → 做空
+    if (kPrev >= dPrev && kCurr < dCurr && kCurr > overboughtThreshold) return {'isLong': false};
     return null;
   }
 

@@ -74,6 +74,11 @@ class _BacktestPageState extends State<BacktestPage> {
     _paramControllers['dmiPeriod']          = TextEditingController(text: _params.dmiPeriod.toString());
     _paramControllers['dmiAdxPeriod']      = TextEditingController(text: _params.dmiAdxPeriod.toString());
     _paramControllers['dmiTrendThreshold'] = TextEditingController(text: _params.dmiTrendThreshold.toString());
+    _paramControllers['cciPeriod']          = TextEditingController(text: _params.cciPeriod.toString());
+    _paramControllers['stochRsiPeriod']    = TextEditingController(text: _params.stochRsiPeriod.toString());
+    _paramControllers['stochRsiKPeriod']   = TextEditingController(text: _params.stochRsiKPeriod.toString());
+    _paramControllers['stochRsiDPeriod']   = TextEditingController(text: _params.stochRsiDPeriod.toString());
+    _paramControllers['volumeMAperiod']      = TextEditingController(text: _params.volumeMAperiod.toString());
   }
 
   void _buildDefaultPresets() {
@@ -117,6 +122,8 @@ class _BacktestPageState extends State<BacktestPage> {
           const StrategyParams(maShortPeriod: 5,  maMidPeriod: 20, maLongPeriod: 60),
           const StrategyParams(maShortPeriod: 10, maMidPeriod: 20, maLongPeriod: 60),
           const StrategyParams(maShortPeriod: 5,  maMidPeriod: 30, maLongPeriod: 120),
+          const StrategyParams(maShortPeriod: 5,  maMidPeriod: 10, maLongPeriod: 20, volumeFilter: true, volumeMAperiod: 5),
+          const StrategyParams(maShortPeriod: 5,  maMidPeriod: 20, maLongPeriod: 60, volumeFilter: true, volumeMAperiod: 5),
         ];
       case BacktestStrategy.wr:
         return [
@@ -144,6 +151,18 @@ class _BacktestPageState extends State<BacktestPage> {
             rsiPeriod: 6, rsiOverbought: 65, rsiOversold: 35,
             kdjPeriod: 14, kdjOverbought: 70, kdjOversold: 30,
           ),
+        ];
+      case BacktestStrategy.cci:
+        return [
+          const StrategyParams(cciPeriod: 14),
+          const StrategyParams(cciPeriod: 20),
+          const StrategyParams(cciPeriod: 8),
+        ];
+      case BacktestStrategy.stochRsi:
+        return [
+          const StrategyParams(stochRsiPeriod: 14, stochRsiKPeriod: 3, stochRsiDPeriod: 3),
+          const StrategyParams(stochRsiPeriod: 20, stochRsiKPeriod: 5, stochRsiDPeriod: 3),
+          const StrategyParams(stochRsiPeriod: 10, stochRsiKPeriod: 3, stochRsiDPeriod: 5),
         ];
     }
   }
@@ -423,6 +442,11 @@ class _BacktestPageState extends State<BacktestPage> {
   void _onDmiPeriodChanged(int v) { setState(() { _params = _params.copyWith(dmiPeriod: v); }); _paramControllers['dmiPeriod']?.text = v.toString(); }
   void _onDmiAdxPeriodChanged(int v) { setState(() { _params = _params.copyWith(dmiAdxPeriod: v); }); _paramControllers['dmiAdxPeriod']?.text = v.toString(); }
   void _onDmiTrendThresholdChanged(int v) { setState(() { _params = _params.copyWith(dmiTrendThreshold: v); }); _paramControllers['dmiTrendThreshold']?.text = v.toString(); }
+  void _onCciPeriodChanged(int v) { setState(() { _params = _params.copyWith(cciPeriod: v); }); _paramControllers['cciPeriod']?.text = v.toString(); }
+  void _onStochRsiPeriodChanged(int v) { setState(() { _params = _params.copyWith(stochRsiPeriod: v); }); _paramControllers['stochRsiPeriod']?.text = v.toString(); }
+  void _onStochRsiKPeriodChanged(int v) { setState(() { _params = _params.copyWith(stochRsiKPeriod: v); }); _paramControllers['stochRsiKPeriod']?.text = v.toString(); }
+  void _onStochRsiDPeriodChanged(int v) { setState(() { _params = _params.copyWith(stochRsiDPeriod: v); }); _paramControllers['stochRsiDPeriod']?.text = v.toString(); }
+  void _onVolumeMAPeriodChanged(int v) { setState(() { _params = _params.copyWith(volumeMAperiod: v); }); _paramControllers['volumeMAperiod']?.text = v.toString(); }
 
   Widget _buildIntParamField(String label, String key, int value, ValueChanged<int> onChanged) {
     // B-4 Fix: 使用预创建的 controller，而非每次 build() 时 new
@@ -526,6 +550,24 @@ class _BacktestPageState extends State<BacktestPage> {
                 Expanded(child: _buildIntParamField('长期', 'maLongPeriod', _params.maLongPeriod, _onMaLongPeriodChanged)),
               ],
             ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('均量周期', 'volumeMAperiod', _params.volumeMAperiod, _onVolumeMAPeriodChanged)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Text('放量过滤'),
+                      Switch(
+                        value: _params.volumeFilter,
+                        onChanged: (v) => setState(() { _params = _params.copyWith(volumeFilter: v); }),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         );
       case BacktestStrategy.wr:
@@ -595,6 +637,36 @@ class _BacktestPageState extends State<BacktestPage> {
                 Expanded(child: _buildIntParamField('KDJ超买', 'kdjOverbought', _params.kdjOverbought, _onKdjOverboughtChanged)),
                 const SizedBox(width: 4),
                 Expanded(child: _buildIntParamField('KDJ超卖', 'kdjOversold', _params.kdjOversold, _onKdjOversoldChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.cci:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('CCI 顺势指标参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('CCI周期', 'cciPeriod', _params.cciPeriod, _onCciPeriodChanged)),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.stochRsi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('StochRSI 参数（RSI的RSI）', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('StochRSI周期', 'stochRsiPeriod', _params.stochRsiPeriod, _onStochRsiPeriodChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('K周期', 'stochRsiKPeriod', _params.stochRsiKPeriod, _onStochRsiKPeriodChanged)),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('D周期', 'stochRsiDPeriod', _params.stochRsiDPeriod, _onStochRsiDPeriodChanged)),
               ],
             ),
           ],
@@ -791,6 +863,10 @@ class _BacktestPageState extends State<BacktestPage> {
         return 'DMI(${p.dmiPeriod}) ADX>${p.dmiTrendThreshold}';
       case BacktestStrategy.multi:
         return 'MACD(${p.macdFastPeriod},${p.macdSlowPeriod}) RSI(${p.rsiPeriod}) KDJ(${p.kdjPeriod})';
+      case BacktestStrategy.cci:
+        return 'CCI(${p.cciPeriod})';
+      case BacktestStrategy.stochRsi:
+        return 'StochRSI(${p.stochRsiPeriod},K${p.stochRsiKPeriod},D${p.stochRsiDPeriod})';
     }
   }
 
@@ -1078,6 +1154,8 @@ class _BacktestPageState extends State<BacktestPage> {
       BacktestStrategy.wr => 'WR威廉',
       BacktestStrategy.dmi => 'DMI',
       BacktestStrategy.multi => '多指标综合',
+      BacktestStrategy.cci => 'CCI顺势',
+      BacktestStrategy.stochRsi => 'StochRSI',
     };
   }
 
@@ -1091,6 +1169,8 @@ class _BacktestPageState extends State<BacktestPage> {
       BacktestStrategy.wr => 'WR威廉指标超卖区买入，超买区卖出',
       BacktestStrategy.dmi => 'DMI趋势跟随，ADX确认趋势强度',
       BacktestStrategy.multi => 'MACD + KDJ + RSI 三指标共振',
+      BacktestStrategy.cci => 'CCI从-100以下上穿买入，从+100以上下穿卖出',
+      BacktestStrategy.stochRsi => 'StochRSI金叉在超卖区买入，死叉在超买区卖出',
     };
   }
 }
