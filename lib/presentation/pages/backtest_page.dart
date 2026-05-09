@@ -135,6 +135,13 @@ class _BacktestPageState extends State<BacktestPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () => context.go('/backtest/help'),
+            tooltip: '策略帮助',
+          ),
+        ],
       ),
       body: BlocBuilder<StockBloc, StockState>(
         builder: (context, state) {
