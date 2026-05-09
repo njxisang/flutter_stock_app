@@ -242,7 +242,8 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
 
         // Reserve ~28px at the top for the quick-range buttons bar
         const rangeBarH = 28.0;
-        final chartH = (h - rangeBarH).clamp(80.0, h);
+        final rawChartH = h - rangeBarH;
+        final chartH = rawChartH > 0 ? rawChartH : h;
 
         final alignedMa = _getAlignedMa();
         final theme = _themeColors();

@@ -1,10 +1,12 @@
+import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:math';
+import 'package:http/http.dart' as http;
 import '../../core/constants/app_constants.dart';
-import '../../domain/entities/stock_quote.dart';
 import '../../data/datasources/stock_api_service.dart';
+import '../../domain/entities/stock_quote.dart';
 import '../blocs/watchlist/watchlist_cubit.dart';
 
 class PortfolioAnalysisPage extends StatefulWidget {
@@ -14,9 +16,21 @@ class PortfolioAnalysisPage extends StatefulWidget {
   State<PortfolioAnalysisPage> createState() => _PortfolioAnalysisPageState();
 }
 
+class _SearchResult {
+  final String symbol;
+  final String name;
+  final String market;
+
+  const _SearchResult({required this.symbol, required this.name, required this.market});
+}
+
 class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
   Map<String, StockData> _stockDataMap = {};
   bool _loading = false;
+  final _searchController = TextEditingController();
+  List<_SearchResult> _searchResults = [];
+  bool _searchLoading = false;
+  bool _isSearching = false;
 
   @override
   Widget build(BuildContext context) {
@@ -30,82 +44,139 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
       ),
       body: BlocBuilder<WatchlistCubit, WatchlistState>(
         builder: (context, state) {
-          if (state.items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.pie_chart_outline, size: 64, color: AppColors.textSecondary),
-                  const SizedBox(height: 16),
-                  const Text('自选股为空', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
-                  const SizedBox(height: 8),
-                  const Text('至少需要2只股票进行组合分析', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => context.go('/'),
-                    child: const Text('去添加'),
+          // 搜索栏（始终显示）
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '搜索股票代码或名称添加...',
+                    hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchResults = [];
+                                _isSearching = false;
+                              });
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                ],
+                  style: const TextStyle(fontSize: 14),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _searchStocks(),
+                ),
               ),
-            );
-          }
-
-          if (state.items.length < 2) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.pie_chart_outline, size: 64, color: AppColors.textSecondary),
-                  const SizedBox(height: 16),
-                  const Text('至少需要2只股票', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => context.go('/'),
-                    child: const Text('去添加'),
-                  ),
-                ],
+              // 搜索结果列表
+              if (_isSearching)
+                _searchLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: SizedBox(height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : _searchResults.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text('未找到相关股票', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                          )
+                        : ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 200),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _searchResults.length,
+                              itemBuilder: (context, index) {
+                                final r = _searchResults[index];
+                                final alreadyAdded = state.items.any((item) => item.symbol == r.symbol);
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(r.name, style: const TextStyle(fontSize: 13)),
+                                  subtitle: Text('${r.symbol} · ${r.market}', style: const TextStyle(fontSize: 11)),
+                                  trailing: alreadyAdded
+                                      ? const Icon(Icons.check, color: AppColors.success, size: 18)
+                                      : IconButton(
+                                          icon: const Icon(Icons.add_circle_outline, size: 20),
+                                          color: AppColors.primary,
+                                          onPressed: () => _addStock(r.symbol, r.name),
+                                        ),
+                                );
+                              },
+                            ),
+                          ),
+              // 主内容区
+              Expanded(
+                child: state.items.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.pie_chart_outline, size: 64, color: AppColors.textSecondary),
+                            const SizedBox(height: 16),
+                            const Text('自选股为空', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                            const SizedBox(height: 8),
+                            const Text('至少需要2只股票进行组合分析', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            const SizedBox(height: 8),
+                            Text('在上方搜索框添加股票', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      )
+                    : state.items.length < 2
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.pie_chart_outline, size: 64, color: AppColors.textSecondary),
+                                const SizedBox(height: 16),
+                                const Text('至少需要2只股票', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () => context.go('/'),
+                                  child: const Text('去添加'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_stockDataMap.isEmpty && !_loading)
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => _loadAllStockData(context, state),
+                                      icon: const Icon(Icons.refresh),
+                                      label: Text('加载${state.items.length}只股票数据'),
+                                    ),
+                                  ),
+                                if (_loading) const Center(child: CircularProgressIndicator()),
+                                const SizedBox(height: 12),
+                                if (_stockDataMap.isNotEmpty) ...[
+                                  _buildSummaryCard(state),
+                                  const SizedBox(height: 12),
+                                  _buildPerformanceCard(state),
+                                  const SizedBox(height: 12),
+                                  if (_stockDataMap.length >= 2) ...[
+                                    _buildCorrelationMatrix(state),
+                                    const SizedBox(height: 12),
+                                    _buildPortfolioMetrics(state),
+                                    const SizedBox(height: 12),
+                                    _buildSuggestions(state),
+                                  ],
+                                ],
+                              ],
+                            ),
+                          ),
               ),
-            );
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Load button
-                if (_stockDataMap.isEmpty && !_loading)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _loadAllStockData(context, state),
-                      icon: const Icon(Icons.refresh),
-                      label: Text('加载${state.items.length}只股票数据'),
-                    ),
-                  ),
-                if (_loading) const Center(child: CircularProgressIndicator()),
-                const SizedBox(height: 12),
-
-                if (_stockDataMap.isNotEmpty) ...[
-                  // Summary header
-                  _buildSummaryCard(state),
-                  const SizedBox(height: 12),
-
-                  // Individual performance
-                  _buildPerformanceCard(state),
-                  const SizedBox(height: 12),
-
-                  // Correlation matrix
-                  if (_stockDataMap.length >= 2) ...[
-                    _buildCorrelationMatrix(state),
-                    const SizedBox(height: 12),
-                    _buildPortfolioMetrics(state),
-                    const SizedBox(height: 12),
-                    _buildSuggestions(state),
-                  ],
-                ],
-              ],
-            ),
+            ],
           );
         },
       ),
@@ -426,5 +497,75 @@ class _PortfolioAnalysisPageState extends State<PortfolioAnalysisPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _searchStocks() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+    setState(() {
+      _searchLoading = true;
+      _isSearching = true;
+      _searchResults = [];
+    });
+
+    try {
+      final types = ['14', '5', '16', '28', '7'];
+      final results = <_SearchResult>[];
+
+      for (final type in types) {
+        if (results.isNotEmpty) break;
+        try {
+          final url = 'https://searchapi.eastmoney.com/api/suggest/get?input=$query&type=$type&count=5';
+          final response = await http.get(
+            Uri.parse(url),
+            headers: {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://quote.eastmoney.com/'},
+          );
+          if (response.statusCode == 200) {
+            final json = jsonDecode(response.body) as Map<String, dynamic>;
+            final table = json['QuotationCodeTable'] as Map<String, dynamic>?;
+            final data = table?['Data'] as List<dynamic>?;
+            if (data != null && data.isNotEmpty) {
+              for (final item in data) {
+                final mkt = _marketLabel(item['MktNum']?.toString() ?? '');
+                results.add(_SearchResult(
+                  symbol: item['Code']?.toString() ?? '',
+                  name: item['Name']?.toString() ?? '',
+                  market: mkt,
+                ));
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _searchLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _searchLoading = false);
+      }
+    }
+  }
+
+  String _marketLabel(String mktNum) {
+    return switch (mktNum) {
+      '1' => '上交所',
+      '2' => '深交所',
+      '5' => '北交所',
+      _ => '未知',
+    };
+  }
+
+  Future<void> _addStock(String symbol, String name) async {
+    context.read<WatchlistCubit>().addToWatchlist(symbol, name);
+    _searchController.clear();
+    setState(() {
+      _searchResults = [];
+      _isSearching = false;
+    });
   }
 }
