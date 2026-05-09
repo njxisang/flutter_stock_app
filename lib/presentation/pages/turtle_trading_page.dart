@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
 
@@ -65,6 +66,10 @@ class _TurtleTradingPageState extends State<TurtleTradingPage> with SingleTicker
       appBar: AppBar(
         title: const Text('海龟交易'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () => context.go('/turtle-help'),
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _showSettingsSheet,

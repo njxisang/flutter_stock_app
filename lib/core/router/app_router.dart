@@ -13,6 +13,7 @@ import '../../presentation/pages/portfolio_analysis_page.dart';
 import '../../presentation/pages/settings_page.dart';
 import '../../presentation/pages/money_flow_page.dart';
 import '../../presentation/pages/backtest_help_page.dart';
+import '../../presentation/pages/turtle_help_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -62,6 +63,12 @@ class AppRouter {
             path: '/turtle',
             pageBuilder: (context, state) => const NoTransitionPage(
               child: TurtleTradingPage(),
+            ),
+          ),
+          GoRoute(
+            path: '/turtle-help',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: TurtleHelpPage(),
             ),
           ),
           GoRoute(
