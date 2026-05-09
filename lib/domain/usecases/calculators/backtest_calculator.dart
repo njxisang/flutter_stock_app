@@ -5,19 +5,121 @@ import 'package:flutter_stock_app/domain/usecases/calculators/rsi_calculator.dar
 
 enum BacktestStrategy { macd, kdj, rsi, boll, ma, wr, dmi, multi }
 
+/// 策略参数配置（所有策略通用结构）
+class StrategyParams {
+  // ─── MACD参数 ───
+  final int macdFastPeriod;    // 默认12
+  final int macdSlowPeriod;    // 默认26
+  final int macdSignalPeriod;  // 默认9
+
+  // ─── KDJ参数 ───
+  final int kdjPeriod;         // 默认9
+  final int kdjKPeriod;        // 默认3
+  final int kdjDPeriod;        // 默认3
+  final int kdjOverbought;     // 默认80
+  final int kdjOversold;       // 默认20
+
+  // ─── RSI参数 ───
+  final int rsiPeriod;         // 默认14
+  final int rsiOverbought;     // 默认70
+  final int rsiOversold;       // 默认30
+
+  // ─── BOLL参数 ───
+  final int bollPeriod;        // 默认20
+  final int bollStdDev;        // 默认2（倍數）
+
+  // ─── MA参数 ───
+  final int maShortPeriod;     // 默认5
+  final int maMidPeriod;       // 默认10
+  final int maLongPeriod;      // 默认20
+
+  // ─── WR参数 ───
+  final int wrPeriod;         // 默认10
+  final int wrOverbought;      // 默认20（WR>此值超买，做空）
+  final int wrOversold;       // 默认80（WR<此值超卖，做多）
+
+  // ─── DMI参数 ───
+  final int dmiPeriod;         // 默认14
+  final int dmiAdxPeriod;      // 默认14（ADX自身平滑周期）
+  final int dmiTrendThreshold; // 默认25（ADX>此值认为有趋势）
+
+  const StrategyParams({
+    this.macdFastPeriod = 12,
+    this.macdSlowPeriod = 26,
+    this.macdSignalPeriod = 9,
+    this.kdjPeriod = 9,
+    this.kdjKPeriod = 3,
+    this.kdjDPeriod = 3,
+    this.kdjOverbought = 80,
+    this.kdjOversold = 20,
+    this.rsiPeriod = 14,
+    this.rsiOverbought = 70,
+    this.rsiOversold = 30,
+    this.bollPeriod = 20,
+    this.bollStdDev = 2,
+    this.maShortPeriod = 5,
+    this.maMidPeriod = 10,
+    this.maLongPeriod = 20,
+    this.wrPeriod = 10,
+    this.wrOverbought = 20,
+    this.wrOversold = 80,
+    this.dmiPeriod = 14,
+    this.dmiAdxPeriod = 14,
+    this.dmiTrendThreshold = 25,
+  });
+
+  /// 默认参数工厂
+  factory StrategyParams.defaults() => const StrategyParams();
+
+  StrategyParams copyWith({
+    int? macdFastPeriod, int? macdSlowPeriod, int? macdSignalPeriod,
+    int? kdjPeriod, int? kdjKPeriod, int? kdjDPeriod, int? kdjOverbought, int? kdjOversold,
+    int? rsiPeriod, int? rsiOverbought, int? rsiOversold,
+    int? bollPeriod, int? bollStdDev,
+    int? maShortPeriod, int? maMidPeriod, int? maLongPeriod,
+    int? wrPeriod, int? wrOverbought, int? wrOversold,
+    int? dmiPeriod, int? dmiAdxPeriod, int? dmiTrendThreshold,
+  }) => StrategyParams(
+    macdFastPeriod: macdFastPeriod ?? this.macdFastPeriod,
+    macdSlowPeriod: macdSlowPeriod ?? this.macdSlowPeriod,
+    macdSignalPeriod: macdSignalPeriod ?? this.macdSignalPeriod,
+    kdjPeriod: kdjPeriod ?? this.kdjPeriod,
+    kdjKPeriod: kdjKPeriod ?? this.kdjKPeriod,
+    kdjDPeriod: kdjDPeriod ?? this.kdjDPeriod,
+    kdjOverbought: kdjOverbought ?? this.kdjOverbought,
+    kdjOversold: kdjOversold ?? this.kdjOversold,
+    rsiPeriod: rsiPeriod ?? this.rsiPeriod,
+    rsiOverbought: rsiOverbought ?? this.rsiOverbought,
+    rsiOversold: rsiOversold ?? this.rsiOversold,
+    bollPeriod: bollPeriod ?? this.bollPeriod,
+    bollStdDev: bollStdDev ?? this.bollStdDev,
+    maShortPeriod: maShortPeriod ?? this.maShortPeriod,
+    maMidPeriod: maMidPeriod ?? this.maMidPeriod,
+    maLongPeriod: maLongPeriod ?? this.maLongPeriod,
+    wrPeriod: wrPeriod ?? this.wrPeriod,
+    wrOverbought: wrOverbought ?? this.wrOverbought,
+    wrOversold: wrOversold ?? this.wrOversold,
+    dmiPeriod: dmiPeriod ?? this.dmiPeriod,
+    dmiAdxPeriod: dmiAdxPeriod ?? this.dmiAdxPeriod,
+    dmiTrendThreshold: dmiTrendThreshold ?? this.dmiTrendThreshold,
+  );
+}
+
 class BacktestCalculator {
-  /// 执行回测
+  /// 执行回测（参数化版本）
   /// [quotes] 股票数据
   /// [strategy] 策略类型
   /// [initialCapital] 初始资金
-  /// [feeRate] 手续费率
-  /// [positionRatio] 仓位比例
+  /// [feeRate] 手续费率（双边，一般0.0005~0.001）
+  /// [positionRatio] 仓位比例（0~1）
+  /// [params] 策略参数
   static BacktestResult runBacktest(
     List<StockQuote> quotes,
     BacktestStrategy strategy, {
     double initialCapital = 100000,
     double feeRate = 0.001,
     double positionRatio = 1.0,
+    StrategyParams params = const StrategyParams(),
   }) {
     if (quotes.length < 30) {
       return _emptyResult(initialCapital);
@@ -40,7 +142,7 @@ class BacktestCalculator {
     double totalLoss = 0;
 
     for (var i = 30; i < quotes.length; i++) {
-      final signal = _getSignal(quotes.sublist(0, i + 1), strategy);
+      final signal = _getSignal(quotes.sublist(0, i + 1), strategy, params);
 
       // 涨跌停限制检查
       bool canBuy = true;
@@ -143,247 +245,315 @@ class BacktestCalculator {
     );
   }
 
-  static Map<String, dynamic>? _getSignal(List<StockQuote> quotes, BacktestStrategy strategy) {
+  static Map<String, dynamic>? _getSignal(List<StockQuote> quotes, BacktestStrategy strategy, StrategyParams params) {
     switch (strategy) {
       case BacktestStrategy.macd:
-        return _macdSignal(quotes);
+        return _macdSignal(quotes, params);
       case BacktestStrategy.kdj:
-        return _kdjSignal(quotes);
+        return _kdjSignal(quotes, params);
       case BacktestStrategy.rsi:
-        return _rsiSignal(quotes);
+        return _rsiSignal(quotes, params);
       case BacktestStrategy.boll:
-        return _bollSignal(quotes);
+        return _bollSignal(quotes, params);
       case BacktestStrategy.ma:
-        return _maSignal(quotes);
+        return _maSignal(quotes, params);
       case BacktestStrategy.wr:
-        return _wrSignal(quotes);
+        return _wrSignal(quotes, params);
       case BacktestStrategy.dmi:
-        return _dmiSignal(quotes);
+        return _dmiSignal(quotes, params);
       case BacktestStrategy.multi:
-        return _multiSignal(quotes);
+        return _multiSignal(quotes, params);
     }
   }
 
-  static Map<String, dynamic>? _macdSignal(List<StockQuote> quotes) {
-    if (quotes.length < 35) return null;
+  // ═══════════════════════════════════════════════════
+  //  MACD 信号（参数化 + 正确DEA计算）
+  //  DIF = EMA(fast) - EMA(slow)，DEA = EMA(DIF, signalPeriod)
+  //  金叉：DIF从下方穿越DEA → 做多；死叉：DIF从上方穿越DEA → 做空
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _macdSignal(List<StockQuote> quotes, StrategyParams params) {
+    final minLen = params.macdSlowPeriod + params.macdSignalPeriod + 1;
+    if (quotes.length < minLen) return null;
 
     final closes = quotes.map((q) => q.close).toList();
-    final ema12 = _ema(closes, 12);
-    final ema26 = _ema(closes, 26);
+    final emaFast = _ema(closes, params.macdFastPeriod);
+    final emaSlow = _ema(closes, params.macdSlowPeriod);
 
-    // EMA12从索引12开始，EMA26从索引26开始
-    // DIF = EMA12 - EMA26，需要对齐到同一个时间点
-    // EMA12比EMA26多14个元素（26-12=14），所以从EMA12[14]开始减EMA26[0]
-    if (ema12.length < 15 || ema26.length < 2) return null;
+    // 对齐到同一时间点：DIF[i] = emaFast对齐位置 - emaSlow[i]
+    if (emaFast.length < 2 || emaSlow.length < 2) return null;
+    final offset = emaFast.length - emaSlow.length;
+    final difLen = emaSlow.length;
 
-    // 计算最近几天的DIF
-    final difValues = <double>[];
-    final startIdx = ema12.length - ema26.length;
-    for (var i = 0; i < ema26.length; i++) {
-      difValues.add(ema12[startIdx + i] - ema26[i]);
+    final difValues = List<double>.generate(difLen, (i) => emaFast[offset + i] - emaSlow[i]);
+    if (difValues.length < 2) return null;
+
+    // ── 迭代计算DEA（正确方式：每天用当天DIF更新DEA）──
+    // 第一天DEA = 当天DIF（初始值）
+    final deaValues = <double>[difValues[0]];
+    final alpha = 2.0 / (params.macdSignalPeriod + 1); // 平滑系数
+    for (var i = 1; i < difValues.length; i++) {
+      deaValues.add((difValues[i] - deaValues[i - 1]) * alpha + deaValues[i - 1]);
     }
 
-    if (difValues.length < 3) return null;
-
-    // DIF上穿DEA（金叉）
+    if (deaValues.length < 2) return null;
     final dif1 = difValues[difValues.length - 2];
     final dif2 = difValues[difValues.length - 1];
-    final dea1 = _ema(difValues, 9)[difValues.length - 2];
-    final dea2 = _ema(difValues, 9)[difValues.length - 1];
+    final dea1 = deaValues[deaValues.length - 2];
+    final dea2 = deaValues[deaValues.length - 1];
 
     if (dif1 <= dea1 && dif2 > dea2) return {'isLong': true};
     if (dif1 >= dea1 && dif2 < dea2) return {'isLong': false};
     return null;
   }
 
-  static Map<String, dynamic>? _kdjSignal(List<StockQuote> quotes) {
-    if (quotes.length < 9) return null;
+  // ═══════════════════════════════════════════════════
+  //  KDJ 信号（参数化 + 修复：去掉过于严格的超买超卖过滤）
+  //  金叉（K上穿D）→ 做多；死叉（K下穿D）→ 做空
+  //  可选：在极值区（K<20超卖 / K>80超买）加强信号
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _kdjSignal(List<StockQuote> quotes, StrategyParams params) {
+    if (quotes.length < params.kdjPeriod + 1) return null;
 
-    // 使用专业的KDJ计算器
-    final kdjData = KdjCalculator.calculate(quotes);
+    final kdjData = KdjCalculator.calculate(quotes, period: params.kdjPeriod);
     if (kdjData.length < 2) return null;
 
     final current = kdjData.last;
     final prev = kdjData[kdjData.length - 2];
 
-    // K值从下往上穿越D值，且都在超卖区
-    if (prev.k < prev.d && current.k > current.d && current.k < 20 && current.d < 20) {
+    // 金叉：K从下方穿越D
+    if (prev.k < prev.d && current.k > current.d) {
+      // 加强条件：K在超卖区（可选）
+      if (current.k < params.kdjOversold) return {'isLong': true};
+      // 无超卖条件也做多（普通金叉）
       return {'isLong': true};
     }
-    // K值从上往下穿越D值，且都在超买区
-    if (prev.k > prev.d && current.k < current.d && current.k > 80 && current.d > 80) {
+    // 死叉：K从上方穿越D
+    if (prev.k > prev.d && current.k < current.d) {
+      // 加强条件：K在超买区
+      if (current.k > params.kdjOverbought) return {'isLong': false};
       return {'isLong': false};
     }
     return null;
   }
 
-  static Map<String, dynamic>? _rsiSignal(List<StockQuote> quotes) {
-    if (quotes.length < 15) return null;
+  // ═══════════════════════════════════════════════════
+  //  RSI 信号（参数化 + 修复：RSI<30做多，RSI>70做空，
+  //  改为上穿/下穿阈值而非单纯比较）
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _rsiSignal(List<StockQuote> quotes, StrategyParams params) {
+    if (quotes.length < params.rsiPeriod + 2) return null;
 
-    // 使用专业的RSI计算器（Wilder平滑法）
-    final rsiData = RsiCalculator.calculate(quotes);
+    final rsiData = RsiCalculator.calculate(quotes, period: params.rsiPeriod);
     if (rsiData.length < 2) return null;
 
     final current = rsiData.last.rsi;
     final prev = rsiData[rsiData.length - 2].rsi;
 
-    // RSI从超卖区上穿
-    if (prev < 30 && current >= 30) return {'isLong': true};
-    // RSI从超买区下穿
-    if (prev > 70 && current <= 70) return {'isLong': false};
+    // RSI从超卖区上穿threshold → 做多
+    if (prev < params.rsiOversold && current >= params.rsiOversold) return {'isLong': true};
+    // RSI从超买区下穿threshold → 做空
+    if (prev > params.rsiOverbought && current <= params.rsiOverbought) return {'isLong': false};
     return null;
   }
 
-  static Map<String, dynamic>? _bollSignal(List<StockQuote> quotes) {
-    if (quotes.length < 21) return null;
+  // ═══════════════════════════════════════════════════
+  //  BOLL 信号（参数化 + 修复：标准差除数改为N，与通达信一致）
+  //  价格向上突破上轨 → 做多；价格向下突破下轨 → 做空
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _bollSignal(List<StockQuote> quotes, StrategyParams params) {
+    final n = params.bollPeriod;
+    if (quotes.length < n + 1) return null;
 
-    // 使用20日布林带
-    final closes = quotes.sublist(quotes.length - 20).map((q) => q.close).toList();
-    final middle = closes.reduce((a, b) => a + b) / 20;
+    final closes = quotes.sublist(quotes.length - n).map((q) => q.close).toList();
+    final middle = closes.reduce((a, b) => a + b) / n;
 
     var variance = 0.0;
     for (final c in closes) {
       variance += pow(c - middle, 2);
     }
-    variance /= 19;  // BOLL用N-1做样本方差
+    variance /= n; // 通达信/同花顺：除N（非N-1）
     final stdDev = sqrt(variance);
 
-    final upper = middle + 2 * stdDev;
-    final lower = middle - 2 * stdDev;
+    final upper = middle + params.bollStdDev * stdDev;
+    final lower = middle - params.bollStdDev * stdDev;
     final currentPrice = quotes.last.close;
     final prevPrice = quotes[quotes.length - 2].close;
 
-    // 价格从下轨下方向上突破下轨买入
+    // 价格向上突破下轨 → 做多
     if (prevPrice < lower && currentPrice >= lower) return {'isLong': true};
-    // 价格从上轨上方，向下跌破上轨卖出
+    // 价格向下突破上轨 → 做空
     if (prevPrice > upper && currentPrice <= upper) return {'isLong': false};
     return null;
   }
 
-  static Map<String, dynamic>? _maSignal(List<StockQuote> quotes) {
-    if (quotes.length < 21) return null;
+  // ═══════════════════════════════════════════════════
+  //  MA 均线信号（参数化）
+  //  空头排列转多头排列（短>中>长，且之前不是）→ 做多
+  //  多头排列转空头排列（短<中<长，且之前不是）→ 做空
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _maSignal(List<StockQuote> quotes, StrategyParams params) {
+    final s = params.maShortPeriod;
+    final m = params.maMidPeriod;
+    final l = params.maLongPeriod;
+    if (quotes.length < l + 1) return null;
 
-    // 计算MA5, MA10, MA20
-    double ma5 = 0, ma10 = 0, ma20 = 0;
-    for (var i = 0; i < 5; i++) ma5 += quotes[quotes.length - 1 - i].close;
-    for (var i = 0; i < 10; i++) ma10 += quotes[quotes.length - 1 - i].close;
-    for (var i = 0; i < 20; i++) ma20 += quotes[quotes.length - 1 - i].close;
-    ma5 /= 5;
-    ma10 /= 10;
-    ma20 /= 20;
+    double calcMa(int len) {
+      double sum = 0;
+      for (var i = 0; i < len; i++) sum += quotes[quotes.length - 1 - i].close;
+      return sum / len;
+    }
 
-    // 上一根K线的均线状态
-    double prevMa5 = 0, prevMa10 = 0, prevMa20 = 0;
-    for (var i = 1; i <= 5; i++) prevMa5 += quotes[quotes.length - 2 - i].close;
-    for (var i = 1; i <= 10; i++) prevMa10 += quotes[quotes.length - 2 - i].close;
-    for (var i = 1; i <= 20; i++) prevMa20 += quotes[quotes.length - 2 - i].close;
-    prevMa5 /= 5;
-    prevMa10 /= 10;
-    prevMa20 /= 20;
+    double calcPrevMa(int len) {
+      double sum = 0;
+      for (var i = 1; i <= len; i++) sum += quotes[quotes.length - 1 - i].close;
+      return sum / len;
+    }
 
-    // 空头排列转多头排列（金叉买入）
-    if (prevMa5 <= prevMa10 && ma5 > ma10 && ma10 > ma20 && prevMa20 > prevMa10) return {'isLong': true};
-    // 多头排列转空头排列（死叉卖出）
-    if (prevMa5 >= prevMa10 && ma5 < ma10 && ma10 < ma20 && prevMa20 < prevMa10) return {'isLong': false};
+    final maS = calcMa(s);
+    final maM = calcMa(m);
+    final maL = calcMa(l);
+    final prevMaS = calcPrevMa(s);
+    final prevMaM = calcPrevMa(m);
+    final prevMaL = calcPrevMa(l);
+
+    // 金叉：空头(短<=中) → 多头(短>中>长)，且之前中<长
+    if (prevMaS <= prevMaM && maS > maM && maM > maL && prevMaM <= prevMaL) return {'isLong': true};
+    // 死叉：多头(短>=中) → 空头(短<中<长)，且之前中>长
+    if (prevMaS >= prevMaM && maS < maM && maM < maL && prevMaM >= prevMaL) return {'isLong': false};
     return null;
   }
 
-  static Map<String, dynamic>? _wrSignal(List<StockQuote> quotes) {
-    if (quotes.length < 10) return null;
+  // ═══════════════════════════════════════════════════
+  //  WR 威廉指标信号（参数化 + 修复：WR>oversold(80)为超卖买入，
+  //  WR<overbought(20)为超买卖出，与实际逻辑一致）
+  //  WR = (HHV - C) / (HHV - LLV) * 100
+  //  WR>80（价格贴近低点）= 超卖 → 潜在买入机会
+  //  WR<20（价格贴近高点）= 超买 → 潜在卖出机会
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _wrSignal(List<StockQuote> quotes, StrategyParams params) {
+    if (quotes.length < params.wrPeriod + 1) return null;
 
-    // WR威廉指标，10日周期
-    double highestHigh = quotes[quotes.length - 10].high;
-    double lowestLow = quotes[quotes.length - 10].low;
-    for (var i = quotes.length - 10; i < quotes.length; i++) {
-      if (quotes[i].high > highestHigh) highestHigh = quotes[i].high;
-      if (quotes[i].low < lowestLow) lowestLow = quotes[i].low;
-    }
+    final wr = _calcWrSingle(quotes, params.wrPeriod);
+    final prevWr = _calcWrSingle(quotes.sublist(0, quotes.length - 1), params.wrPeriod);
 
-    final wr = highestHigh == lowestLow ? 50 : (highestHigh - quotes.last.close) / (highestHigh - lowestLow) * 100;
-    final prevWr = _calcWrSingle(quotes.sublist(0, quotes.length - 1), 10);
-
-    // WR从80以上向上突破（超卖区上穿）
-    if (prevWr <= 80 && wr > 80) return {'isLong': true};
-    // WR从20以下向下突破（超买区下穿）
-    if (prevWr >= 20 && wr < 20) return {'isLong': false};
+    // WR从超卖区（>oversold）向上突破 → 价格从低位反弹 → 做多
+    if (prevWr <= params.wrOversold && wr > params.wrOversold) return {'isLong': true};
+    // WR从超买区（<overbought）向下跌破 → 价格从高位回落 → 做空
+    if (prevWr >= params.wrOverbought && wr < params.wrOverbought) return {'isLong': false};
     return null;
   }
 
   static double _calcWrSingle(List<StockQuote> quotes, int period) {
-    if (quotes.length < period) return 50;
+    if (quotes.length < period) return 50.0;
     double highestHigh = quotes[quotes.length - period].high;
     double lowestLow = quotes[quotes.length - period].low;
     for (var i = quotes.length - period; i < quotes.length; i++) {
       if (quotes[i].high > highestHigh) highestHigh = quotes[i].high;
       if (quotes[i].low < lowestLow) lowestLow = quotes[i].low;
     }
-    return highestHigh == lowestLow ? 50 : (highestHigh - quotes.last.close) / (highestHigh - lowestLow) * 100;
+    return highestHigh == lowestLow ? 50.0 : (highestHigh - quotes.last.close) / (highestHigh - lowestLow) * 100;
   }
 
-  static Map<String, dynamic>? _dmiSignal(List<StockQuote> quotes) {
-    // DMI信号：使用简化版ADX判断趋势强度
-    if (quotes.length < 28) return null;
+  // ═══════════════════════════════════════════════════
+  //  DMI 信号（参数化 + 修复：迭代计算真实ADX）
+  //  +DI > -DI 且 ADX 上升（>threshold）→ 做多
+  //  -DI > +DI 且 ADX 上升（>threshold）→ 做空
+  //  ADX < threshold → 无趋势，不操作
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _dmiSignal(List<StockQuote> quotes, StrategyParams params) {
+    if (quotes.length < params.dmiPeriod * 2 + 1) return null;
 
-    // 计算简化DMI（仅用最后14个数据）
-    double sumTr = 0, sumPlusDm = 0, sumMinusDm = 0;
-    double prevClose = quotes[0].close;
+    final n = params.dmiPeriod;
 
-    for (var i = 1; i <= 14; i++) {
+    // ── 计算TR, +DM, -DM（逐日）──
+    final trList = <double>[];
+    final plusDmList = <double>[];
+    final minusDmList = <double>[];
+
+    for (var i = 1; i < quotes.length; i++) {
       final high = quotes[i].high;
       final low = quotes[i].low;
-      final close = quotes[i].close;
-      final tr1 = high - low;
-      final tr2 = (high - prevClose).abs();
-      final tr3 = (low - prevClose).abs();
-      final tr = [tr1, tr2, tr3].reduce((a, b) => a > b ? a : b);
-      sumTr += tr;
-      final plusDm = high - quotes[i - 1].high > quotes[i - 1].low - low
-          ? (high - quotes[i - 1].high).clamp(0.0, double.infinity)
-          : 0.0;
-      final minusDm = quotes[i - 1].low - low > high - quotes[i - 1].high
-          ? (quotes[i - 1].low - low).clamp(0.0, double.infinity)
-          : 0.0;
-      sumPlusDm += plusDm;
-      sumMinusDm += minusDm;
-      prevClose = close;
+      final prevClose = quotes[i - 1].close;
+      final tr = [high - low, (high - prevClose).abs(), (low - prevClose).abs()].reduce((a, b) => a > b ? a : b);
+      trList.add(tr);
+
+      final upMove = high - quotes[i - 1].high;
+      final downMove = quotes[i - 1].low - low;
+      final plusDm = (upMove > downMove && upMove > 0) ? upMove : 0.0;
+      final minusDm = (downMove > upMove && downMove > 0) ? downMove : 0.0;
+      plusDmList.add(plusDm);
+      minusDmList.add(minusDm);
     }
 
-    final plusDi14 = sumTr == 0 ? 0.0 : sumPlusDm / sumTr * 100;
-    final minusDi14 = sumTr == 0 ? 0.0 : sumMinusDm / sumTr * 100;
-    final dx = plusDi14 + minusDi14 == 0 ? 0.0 : (plusDi14 - minusDi14).abs() / (plusDi14 + minusDi14) * 100;
-    final adx = dx; // 简化版ADX等同于DX
+    // ── Wilder平滑 ──
+    double smoothTr(double tr) => tr; // 仅占位，Wilder平滑在下面循环中做
+    double smoothPlusDm(double dm) => dm;
+    double smoothMinusDm(double dm) => dm;
 
-    // ADX从低上升且高于30：趋势确认，做多
-    // ADX从高下降且高于30后下跌：趋势减弱，做空
-    // ADX低于20：市场无趋势，不操作
-    if (adx < 20) return null; // 无趋势
+    // ── 迭代计算 DIx, ADX ──
+    // ATR[i] = (ATR[i-1]*(n-1) + TR[i]) / n
+    // +DI[i] = (+DM[i] / ATR[i]) * 100
+    // -DI[i] = (-DM[i] / ATR[i]) * 100
+    // DX[i] = |+DI - -DI| / (+DI + -DI) * 100
+    // ADX[i] = (ADX[i-1]*(n-1) + DX[i]) / n
 
-    // 使用前一个ADX值对比
-    final prevAdx = adx; // 简化版只用当前值
-    if (prevAdx > 25 && plusDi14 > minusDi14) return {'isLong': true};
-    if (prevAdx > 25 && minusDi14 > plusDi14) return {'isLong': false};
+    double atr = 0, plusDi = 0, minusDi = 0, adx = 0;
+    final diSeries = <(double, double, double)>[]; // (+DI, -DI, ADX)
+
+    for (var i = n; i < trList.length; i++) {
+      if (i == n) {
+        // 初始化：前n个TR/DM之和
+        double sumTr = 0, sumPlusDm = 0, sumMinusDm = 0;
+        for (var j = 0; j < n; j++) {
+          sumTr += trList[j];
+          sumPlusDm += plusDmList[j];
+          sumMinusDm += minusDmList[j];
+        }
+        atr = sumTr / n;
+        plusDi = sumTr == 0 ? 0 : sumPlusDm / sumTr * 100;
+        minusDi = sumTr == 0 ? 0 : sumMinusDm / sumTr * 100;
+      } else {
+        atr = (atr * (n - 1) + trList[i]) / n;
+        plusDi = atr == 0 ? 0 : plusDmList[i] / atr * 100;
+        minusDi = atr == 0 ? 0 : minusDmList[i] / atr * 100;
+      }
+
+      final dx = plusDi + minusDi == 0 ? 0.0 : (plusDi - minusDi).abs() / (plusDi + minusDi) * 100;
+      if (i == n) {
+        adx = dx.toDouble();
+      } else {
+        adx = (adx * (n - 1) + dx) / n;
+      }
+      diSeries.add((plusDi, minusDi, adx));
+    }
+
+    if (diSeries.length < 2) return null;
+    final (plusDiCurr, minusDiCurr, adxCurr) = diSeries.last;
+    final (_, __, adxPrev) = diSeries[diSeries.length - 2];
+
+    // ADX < threshold：无趋势
+    if (adxCurr < params.dmiTrendThreshold) return null;
+    // ADX上升 + +DI > -DI → 上升趋势，做多
+    if (adxCurr > adxPrev && plusDiCurr > minusDiCurr) return {'isLong': true};
+    // ADX上升 + -DI > +DI → 下降趋势，做空
+    if (adxCurr > adxPrev && minusDiCurr > plusDiCurr) return {'isLong': false};
     return null;
   }
 
-  static Map<String, dynamic>? _multiSignal(List<StockQuote> quotes) {
-    // 多策略共振
-    final macd = _macdSignal(quotes);
-    final kdj = _kdjSignal(quotes);
-    final rsi = _rsiSignal(quotes);
+  // ═══════════════════════════════════════════════════
+  //  多策略共振信号（参数化）
+  //  至少N个子策略同向时产生信号（默认2个）
+  // ═══════════════════════════════════════════════════
+  static Map<String, dynamic>? _multiSignal(List<StockQuote> quotes, StrategyParams params) {
+    // 使用 MACD / KDJ / RSI 三个主流指标
+    final macd = _macdSignal(quotes, params);
+    final kdj = _kdjSignal(quotes, params);
+    final rsi = _rsiSignal(quotes, params);
 
     int longCount = 0, shortCount = 0;
-    if (macd != null) {
-      if (macd['isLong']) longCount++;
-      else shortCount++;
-    }
-    if (kdj != null) {
-      if (kdj['isLong']) longCount++;
-      else shortCount++;
-    }
-    if (rsi != null) {
-      if (rsi['isLong']) longCount++;
-      else shortCount++;
-    }
+    if (macd != null) { macd['isLong'] ? longCount++ : shortCount++; }
+    if (kdj != null) { kdj['isLong'] ? longCount++ : shortCount++; }
+    if (rsi != null) { rsi['isLong'] ? longCount++ : shortCount++; }
 
     if (longCount >= 2) return {'isLong': true};
     if (shortCount >= 2) return {'isLong': false};

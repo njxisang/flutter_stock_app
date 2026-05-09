@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/stock_quote.dart';
 import '../../domain/usecases/calculators/backtest_calculator.dart';
@@ -20,25 +19,104 @@ class _BacktestPageState extends State<BacktestPage> {
   final _initialCapitalController = TextEditingController(text: '100000');
   final _feeRateController = TextEditingController(text: '0.001');
   final _positionRatioController = TextEditingController(text: '1.0');
+
   BacktestResult? _result;
   bool _isRunning = false;
   bool _isLoadingData = false;
 
+  // ─── 多参数批量回测 ───
+  List<_ParamComboResult> _batchResults = [];
+  bool _showBatchPanel = false;
+
+  // ─── 参数编辑 ───
+  bool _showAdvancedParams = false;
+  StrategyParams _params = const StrategyParams();
+
+  // ─── 日期 ───
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 365));
   DateTime _endDate = DateTime.now();
-
   final _dateFormat = DateFormat('yyyy-MM-dd');
 
-  final _strategyDescriptions = {
-    BacktestStrategy.macd: 'MACD金叉买入，死叉卖出',
-    BacktestStrategy.kdj: 'KDJ超卖买入，超买卖出',
-    BacktestStrategy.rsi: 'RSI<30买入，RSI>70卖出',
-    BacktestStrategy.boll: 'BOLL下轨买入，上轨卖出',
-    BacktestStrategy.ma: 'MA多头排列买入，空头排列卖出',
-    BacktestStrategy.wr: 'WR>80买入，WR<20卖出',
-    BacktestStrategy.dmi: 'DMI趋势跟随策略',
-    BacktestStrategy.multi: '多指标共振信号',
-  };
+  // ─── 预置参数组合（多参数比较用）───
+  List<StrategyParams> _presetCombos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _buildDefaultPresets();
+  }
+
+  void _buildDefaultPresets() {
+    // 根据策略生成默认预置组合
+    _presetCombos = _buildPresetsForStrategy(_selectedStrategy);
+  }
+
+  List<StrategyParams> _buildPresetsForStrategy(BacktestStrategy strategy) {
+    switch (strategy) {
+      case BacktestStrategy.macd:
+        return [
+          const StrategyParams(macdFastPeriod: 12, macdSlowPeriod: 26, macdSignalPeriod: 9),
+          const StrategyParams(macdFastPeriod: 6,  macdSlowPeriod: 13, macdSignalPeriod: 5),
+          const StrategyParams(macdFastPeriod: 19, macdSlowPeriod: 39, macdSignalPeriod: 9),
+          const StrategyParams(macdFastPeriod: 8,  macdSlowPeriod: 17, macdSignalPeriod: 7),
+        ];
+      case BacktestStrategy.kdj:
+        return [
+          const StrategyParams(kdjPeriod: 9,  kdjOverbought: 80, kdjOversold: 20),
+          const StrategyParams(kdjPeriod: 14, kdjOverbought: 80, kdjOversold: 20),
+          const StrategyParams(kdjPeriod: 9,  kdjOverbought: 70, kdjOversold: 30),
+          const StrategyParams(kdjPeriod: 18, kdjOverbought: 85, kdjOversold: 15),
+        ];
+      case BacktestStrategy.rsi:
+        return [
+          const StrategyParams(rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30),
+          const StrategyParams(rsiPeriod: 6,  rsiOverbought: 65, rsiOversold: 35),
+          const StrategyParams(rsiPeriod: 21, rsiOverbought: 75, rsiOversold: 25),
+          const StrategyParams(rsiPeriod: 9,  rsiOverbought: 70, rsiOversold: 30),
+        ];
+      case BacktestStrategy.boll:
+        return [
+          const StrategyParams(bollPeriod: 20, bollStdDev: 2),
+          const StrategyParams(bollPeriod: 20, bollStdDev: 3),
+          const StrategyParams(bollPeriod: 14, bollStdDev: 2),
+          const StrategyParams(bollPeriod: 30, bollStdDev: 2),
+        ];
+      case BacktestStrategy.ma:
+        return [
+          const StrategyParams(maShortPeriod: 5,  maMidPeriod: 10, maLongPeriod: 20),
+          const StrategyParams(maShortPeriod: 5,  maMidPeriod: 20, maLongPeriod: 60),
+          const StrategyParams(maShortPeriod: 10, maMidPeriod: 20, maLongPeriod: 60),
+          const StrategyParams(maShortPeriod: 5,  maMidPeriod: 30, maLongPeriod: 120),
+        ];
+      case BacktestStrategy.wr:
+        return [
+          const StrategyParams(wrPeriod: 10, wrOverbought: 20, wrOversold: 80),
+          const StrategyParams(wrPeriod: 6,  wrOverbought: 25, wrOversold: 75),
+          const StrategyParams(wrPeriod: 20, wrOverbought: 20, wrOversold: 80),
+          const StrategyParams(wrPeriod: 14, wrOverbought: 15, wrOversold: 85),
+        ];
+      case BacktestStrategy.dmi:
+        return [
+          const StrategyParams(dmiPeriod: 14, dmiAdxPeriod: 14, dmiTrendThreshold: 25),
+          const StrategyParams(dmiPeriod: 14, dmiAdxPeriod: 14, dmiTrendThreshold: 20),
+          const StrategyParams(dmiPeriod: 14, dmiAdxPeriod: 14, dmiTrendThreshold: 30),
+          const StrategyParams(dmiPeriod: 20, dmiAdxPeriod: 20, dmiTrendThreshold: 25),
+        ];
+      case BacktestStrategy.multi:
+        return [
+          StrategyParams(
+            macdFastPeriod: 12, macdSlowPeriod: 26, macdSignalPeriod: 9,
+            rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30,
+            kdjPeriod: 9, kdjOverbought: 80, kdjOversold: 20,
+          ),
+          StrategyParams(
+            macdFastPeriod: 6, macdSlowPeriod: 13, macdSignalPeriod: 5,
+            rsiPeriod: 6, rsiOverbought: 65, rsiOversold: 35,
+            kdjPeriod: 14, kdjOverbought: 70, kdjOversold: 30,
+          ),
+        ];
+    }
+  }
 
   @override
   void dispose() {
@@ -53,6 +131,10 @@ class _BacktestPageState extends State<BacktestPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('回测'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+        ),
       ),
       body: BlocBuilder<StockBloc, StockState>(
         builder: (context, state) {
@@ -63,7 +145,8 @@ class _BacktestPageState extends State<BacktestPage> {
                 children: [
                   const Icon(Icons.show_chart, size: 64, color: AppColors.textSecondary),
                   const SizedBox(height: 16),
-                  const Text('请先在图表页面加载股票数据', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                  const Text('请先在图表页面加载股票数据',
+                      style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.go('/'),
@@ -79,169 +162,16 @@ class _BacktestPageState extends State<BacktestPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Stock Info
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(state.stockData.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                  Text(state.stockData.symbol, style: const TextStyle(color: AppColors.textSecondary)),
-                                ],
-                              ),
-                            ),
-                            Text('${state.stockData.quotes.length}个数据点'),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.calendar_today, size: 16),
-                                label: Text(_dateFormat.format(_startDate)),
-                                onPressed: () => _selectDate(true),
-                              ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 8),
-                              child: Text('至', style: TextStyle(color: AppColors.textSecondary)),
-                            ),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.calendar_today, size: 16),
-                                label: Text(_dateFormat.format(_endDate)),
-                                onPressed: () => _selectDate(false),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            if (_isLoadingData)
-                              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                            else
-                              IconButton(
-                                icon: const Icon(Icons.refresh, size: 20),
-                                onPressed: () => _ensureDataForRange(state),
-                                tooltip: '补全该时间段数据',
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Strategy Selection
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('策略选择', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<BacktestStrategy>(
-                          value: _selectedStrategy,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          items: BacktestStrategy.values.map((s) {
-                            return DropdownMenuItem(value: s, child: Text(_getStrategyName(s)));
-                          }).toList(),
-                          onChanged: (v) => setState(() => _selectedStrategy = v!),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(_strategyDescriptions[_selectedStrategy] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Parameters
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('参数设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _initialCapitalController,
-                                decoration: const InputDecoration(
-                                  labelText: '初始资金',
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: _feeRateController,
-                                decoration: const InputDecoration(
-                                  labelText: '费率',
-                                  border: OutlineInputBorder(),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _positionRatioController,
-                          decoration: const InputDecoration(
-                            labelText: '仓位比例 (0-1)',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Run Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isRunning ? null : () => _runBacktest(state),
-                    child: _isRunning ? const CircularProgressIndicator() : const Text('运行回测'),
-                  ),
-                ),
+                _buildStockInfoCard(state),
                 const SizedBox(height: 12),
-
-                // Collapsed params summary when result is shown
-                if (_result != null) ...[
-                  ExpansionTile(
-                    title: Text('策略: ${_getStrategyName(_selectedStrategy)} | 初始: ${_initialCapitalController.text} | ${_dateFormat.format(_startDate)}~${_dateFormat.format(_endDate)}',
-                      style: const TextStyle(fontSize: 12)),
-                    tilePadding: EdgeInsets.zero,
-                    childrenPadding: EdgeInsets.zero,
-                    children: [
-                      _buildParamSummary(),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-
-                // Results
-                if (_result != null) _buildResultCard(),
+                _buildStrategyCard(),
+                const SizedBox(height: 12),
+                _buildParamsCard(),
+                const SizedBox(height: 12),
+                _buildActionRow(state),
+                const SizedBox(height: 12),
+                if (_showBatchPanel) _buildBatchResultsPanel(),
+                if (_result != null && !_showBatchPanel) _buildResultCard(),
               ],
             ),
           );
@@ -250,144 +180,544 @@ class _BacktestPageState extends State<BacktestPage> {
     );
   }
 
-  String _getStrategyName(BacktestStrategy s) {
-    return switch (s) {
-      BacktestStrategy.macd => 'MACD',
-      BacktestStrategy.kdj => 'KDJ',
-      BacktestStrategy.rsi => 'RSI',
-      BacktestStrategy.boll => 'BOLL',
-      BacktestStrategy.ma => 'MA均线',
-      BacktestStrategy.wr => 'WR威廉',
-      BacktestStrategy.dmi => 'DMI',
-      BacktestStrategy.multi => '多指标综合',
-    };
-  }
-
-  void _runBacktest(StockLoaded state) async {
-    setState(() => _isRunning = true);
-
-    final initialCapital = double.tryParse(_initialCapitalController.text) ?? 100000;
-    final feeRate = double.tryParse(_feeRateController.text) ?? 0.001;
-    final positionRatio = double.tryParse(_positionRatioController.text) ?? 1.0;
-
-    // 按所选日期过滤数据
-    final filteredQuotes = state.stockData.quotes.where((q) {
-      final d = DateTime.parse(q.date);
-      return !d.isBefore(_startDate) && !d.isAfter(_endDate);
-    }).toList();
-
-    if (filteredQuotes.isEmpty) {
-      if (mounted) {
-        setState(() => _isRunning = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('所选时间段内无数据，请先补全数据')),
-        );
-        _ensureDataForRange(state);
-      }
-      return;
-    }
-
-    try {
-      final result = await Future(() => BacktestCalculator.runBacktest(
-        filteredQuotes,
-        _selectedStrategy,
-        initialCapital: initialCapital,
-        feeRate: feeRate,
-        positionRatio: positionRatio,
-      ));
-
-      if (mounted) {
-        setState(() {
-          _result = result;
-          _isRunning = false;
-        });
-      }
-    } catch (e, st) {
-      debugPrint('Backtest error: $e\n$st');
-      if (mounted) {
-        setState(() => _isRunning = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('回测出错: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _selectDate(bool isStart) async {
-    final initial = isStart ? _startDate : _endDate;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
+  Widget _buildStockInfoCard(StockLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(state.stockData.name,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(state.stockData.symbol,
+                          style: const TextStyle(color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                Text('${state.stockData.quotes.length}个数据点'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(_dateFormat.format(_startDate)),
+                    onPressed: () => _selectDate(true),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('至', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(_dateFormat.format(_endDate)),
+                    onPressed: () => _selectDate(false),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_isLoadingData)
+                  const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 20),
+                    onPressed: () => _ensureDataForRange(state),
+                    tooltip: '补全该时间段数据',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
-    if (picked == null) return;
-    setState(() {
-      if (isStart) {
-        if (picked.isAfter(_endDate)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('开始日期不能晚于结束日期')),
-          );
-          return;
-        }
-        _startDate = picked;
-      } else {
-        if (picked.isBefore(_startDate)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('结束日期不能早于开始日期')),
-          );
-          return;
-        }
-        _endDate = picked;
-      }
-    });
-    _result = null; // 日期变了清除上次结果
   }
 
-  Future<void> _ensureDataForRange(StockLoaded state) async {
-    setState(() => _isLoadingData = true);
+  Widget _buildStrategyCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('策略选择', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                TextButton.icon(
+                  icon: Icon(_showBatchPanel ? Icons.table_rows : Icons.compare_arrows, size: 18),
+                  label: Text(_showBatchPanel ? '单次回测' : '多参数比较'),
+                  onPressed: () => setState(() {
+                    _showBatchPanel = !_showBatchPanel;
+                    if (_showBatchPanel) _batchResults = [];
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<BacktestStrategy>(
+              value: _selectedStrategy,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: BacktestStrategy.values.map((s) {
+                return DropdownMenuItem(value: s, child: Text(_getStrategyName(s)));
+              }).toList(),
+              onChanged: (v) {
+                setState(() {
+                  _selectedStrategy = v!;
+                  _showBatchPanel = false;
+                  _result = null;
+                  _buildDefaultPresets();
+                  _params = const StrategyParams();
+                  _showAdvancedParams = false;
+                });
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _getStrategyDescription(_selectedStrategy),
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    // 检查现有数据是否覆盖所选时间段
-    final existingQuotes = state.stockData.quotes;
-    DateTime? existingStart;
-    DateTime? existingEnd;
+  Widget _buildParamsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 基本参数
+            Row(
+              children: [
+                const Text('参数设置', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                TextButton.icon(
+                  icon: Icon(_showAdvancedParams ? Icons.expand_less : Icons.tune, size: 18),
+                  label: Text(_showAdvancedParams ? '收起' : '策略参数'),
+                  onPressed: () => setState(() => _showAdvancedParams = !_showAdvancedParams),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _initialCapitalController,
+                    decoration: const InputDecoration(
+                      labelText: '初始资金',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _feeRateController,
+                    decoration: const InputDecoration(
+                      labelText: '费率',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _positionRatioController,
+                    decoration: const InputDecoration(
+                      labelText: '仓位(0-1)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            // 策略参数（展开时显示）
+            if (_showAdvancedParams) ...[
+              const Divider(height: 24),
+              _buildStrategyParamsSection(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
-    if (existingQuotes.isNotEmpty) {
-      existingStart = DateTime.parse(existingQuotes.first.date);
-      existingEnd = DateTime.parse(existingQuotes.last.date);
-    }
-
-    bool needFetch = existingQuotes.isEmpty;
-    String start = _dateFormat.format(_startDate);
-    String end = _dateFormat.format(_endDate);
-
-    // 如果起始日期比现有数据更早，需要补
-    if (!needFetch && existingStart != null && _startDate.isBefore(existingStart)) {
-      needFetch = true;
-    }
-    // 如果结束日期比现有数据更晚，需要补
-    if (!needFetch && existingEnd != null && _endDate.isAfter(existingEnd)) {
-      needFetch = true;
-    }
-
-    if (needFetch) {
-      if (mounted) {
-        context.read<StockBloc>().add(LoadStock(
-          state.stockData.symbol,
-          startDate: start,
-          endDate: end,
-        ));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('正在拉取 $start ~ $end 数据...')),
+  Widget _buildStrategyParamsSection() {
+    switch (_selectedStrategy) {
+      case BacktestStrategy.macd:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('MACD 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('快线周期', _params.macdFastPeriod, (v) => setState(() => _params = _params.copyWith(macdFastPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('慢线周期', _params.macdSlowPeriod, (v) => setState(() => _params = _params.copyWith(macdSlowPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('信号周期', _params.macdSignalPeriod, (v) => setState(() => _params = _params.copyWith(macdSignalPeriod: v)))),
+              ],
+            ),
+          ],
         );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('数据已覆盖所选时间段，直接回测')),
+      case BacktestStrategy.kdj:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('KDJ 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', _params.kdjPeriod, (v) => setState(() => _params = _params.copyWith(kdjPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超买区', _params.kdjOverbought, (v) => setState(() => _params = _params.copyWith(kdjOverbought: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超卖区', _params.kdjOversold, (v) => setState(() => _params = _params.copyWith(kdjOversold: v)))),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.rsi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('RSI 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', _params.rsiPeriod, (v) => setState(() => _params = _params.copyWith(rsiPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超买阈值', _params.rsiOverbought, (v) => setState(() => _params = _params.copyWith(rsiOverbought: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超卖阈值', _params.rsiOversold, (v) => setState(() => _params = _params.copyWith(rsiOversold: v)))),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.boll:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('BOLL 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', _params.bollPeriod, (v) => setState(() => _params = _params.copyWith(bollPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('标准差倍数', _params.bollStdDev, (v) => setState(() => _params = _params.copyWith(bollStdDev: v)))),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.ma:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('MA 均线参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('短期', _params.maShortPeriod, (v) => setState(() => _params = _params.copyWith(maShortPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('中期', _params.maMidPeriod, (v) => setState(() => _params = _params.copyWith(maMidPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('长期', _params.maLongPeriod, (v) => setState(() => _params = _params.copyWith(maLongPeriod: v)))),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.wr:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('WR 威廉参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('周期', _params.wrPeriod, (v) => setState(() => _params = _params.copyWith(wrPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超买阈值', _params.wrOverbought, (v) => setState(() => _params = _params.copyWith(wrOverbought: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('超卖阈值', _params.wrOversold, (v) => setState(() => _params = _params.copyWith(wrOversold: v)))),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.dmi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('DMI 参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('DI周期', _params.dmiPeriod, (v) => setState(() => _params = _params.copyWith(dmiPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('ADX周期', _params.dmiAdxPeriod, (v) => setState(() => _params = _params.copyWith(dmiAdxPeriod: v)))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildIntParamField('趋势阈值', _params.dmiTrendThreshold, (v) => setState(() => _params = _params.copyWith(dmiTrendThreshold: v)))),
+              ],
+            ),
+          ],
+        );
+      case BacktestStrategy.multi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('综合指标参数（多策略共振）', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('MACD快', _params.macdFastPeriod, (v) => setState(() => _params = _params.copyWith(macdFastPeriod: v)))),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('MACD慢', _params.macdSlowPeriod, (v) => setState(() => _params = _params.copyWith(macdSlowPeriod: v)))),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('MACD信', _params.macdSignalPeriod, (v) => setState(() => _params = _params.copyWith(macdSignalPeriod: v)))),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('RSI周期', _params.rsiPeriod, (v) => setState(() => _params = _params.copyWith(rsiPeriod: v)))),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('RSI超买', _params.rsiOverbought, (v) => setState(() => _params = _params.copyWith(rsiOverbought: v)))),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('RSI超卖', _params.rsiOversold, (v) => setState(() => _params = _params.copyWith(rsiOversold: v)))),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: _buildIntParamField('KDJ周期', _params.kdjPeriod, (v) => setState(() => _params = _params.copyWith(kdjPeriod: v)))),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('KDJ超买', _params.kdjOverbought, (v) => setState(() => _params = _params.copyWith(kdjOverbought: v)))),
+                const SizedBox(width: 4),
+                Expanded(child: _buildIntParamField('KDJ超卖', _params.kdjOversold, (v) => setState(() => _params = _params.copyWith(kdjOversold: v)))),
+              ],
+            ),
+          ],
+        );
+    }
+  }
+
+  Widget _buildIntParamField(String label, int value, ValueChanged<int> onChanged) {
+    return TextField(
+      controller: TextEditingController(text: value.toString()),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        isDense: true,
+      ),
+      keyboardType: TextInputType.number,
+      onSubmitted: (t) {
+        final parsed = int.tryParse(t);
+        if (parsed != null && parsed > 0) onChanged(parsed);
+      },
+    );
+  }
+
+  Widget _buildActionRow(StockLoaded state) {
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isRunning ? null : () => _runBacktest(state),
+              icon: _isRunning
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.play_arrow),
+              label: Text(_showBatchPanel
+                  ? '运行多参数比较（${_presetCombos.length}组）'
+                  : '运行回测'),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton(
+            onPressed: () => _showParamInfoSheet(context),
+            child: const Icon(Icons.info_outline),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBatchResultsPanel() {
+    if (_batchResults.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Center(
+            child: Column(
+              children: [
+                Icon(Icons.compare_arrows, size: 48, color: AppColors.textSecondary.withAlpha(128)),
+                const SizedBox(height: 12),
+                const Text('点击上方按钮运行多参数比较',
+                    style: TextStyle(color: AppColors.textSecondary)),
+                const SizedBox(height: 8),
+                Text('将使用 ${_presetCombos.length} 组参数依次回测',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
-    setState(() => _isLoadingData = false);
+    // 排序：按总收益降序
+    final sorted = List<_ParamComboResult>.from(_batchResults)
+      ..sort((a, b) => b.result.totalProfit.compareTo(a.result.totalProfit));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.leaderboard, size: 20),
+                const SizedBox(width: 8),
+                const Text('多参数比较结果', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text('${sorted.length}组参数',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+            const Divider(),
+            // 表头
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: const [
+                  SizedBox(width: 32, child: Text('#', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(flex: 3, child: Text('参数', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(child: Text('收益率', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(child: Text('胜率', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(child: Text('夏普', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(child: Text('最大回撤', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(child: Text('交易数', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                ],
+              ),
+            ),
+            const Divider(),
+            // 排序后的行
+            ...sorted.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final r = entry.value;
+              final isTop = idx == 0;
+              final isProfit = r.result.totalProfit >= 0;
+              return InkWell(
+                onTap: () => setState(() {
+                  _result = r.result;
+                  _showBatchPanel = false;
+                  _params = r.params;
+                  _showAdvancedParams = false;
+                }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isTop ? AppColors.success.withAlpha(13) : null,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 32,
+                        child: isTop
+                            ? const Icon(Icons.emoji_events, color: Colors.amber, size: 16)
+                            : Text('${idx + 1}', style: const TextStyle(fontSize: 12)),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          _formatParamsBrief(r.params),
+                          style: const TextStyle(fontSize: 11),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${isProfit ? '+' : ''}${(r.result.totalProfit / r.result.initialCapital * 100).toStringAsFixed(1)}%',
+                          style: TextStyle(fontSize: 12, fontWeight: isTop ? FontWeight.bold : null,
+                              color: isProfit ? AppColors.success : AppColors.error),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text('${r.result.winRate.toStringAsFixed(0)}%',
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                      Expanded(
+                        child: Text(r.result.sharpeRatio.toStringAsFixed(2),
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                      Expanded(
+                        child: Text('${r.result.maxDrawdownPercent.toStringAsFixed(1)}%',
+                            style: const TextStyle(fontSize: 12, color: AppColors.error)),
+                      ),
+                      Expanded(
+                        child: Text('${r.result.totalTrades}',
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            Text(
+              '💡 点击任意行查看该参数详细回测结果',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withAlpha(179)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatParamsBrief(StrategyParams p) {
+    switch (_selectedStrategy) {
+      case BacktestStrategy.macd:
+        return 'MACD(${p.macdFastPeriod},${p.macdSlowPeriod},${p.macdSignalPeriod})';
+      case BacktestStrategy.kdj:
+        return 'KDJ(${p.kdjPeriod}) ${p.kdjOversold}/${p.kdjOverbought}';
+      case BacktestStrategy.rsi:
+        return 'RSI(${p.rsiPeriod}) ${p.rsiOversold}/${p.rsiOverbought}';
+      case BacktestStrategy.boll:
+        return 'BOLL(${p.bollPeriod}) ±${p.bollStdDev}σ';
+      case BacktestStrategy.ma:
+        return 'MA(${p.maShortPeriod},${p.maMidPeriod},${p.maLongPeriod})';
+      case BacktestStrategy.wr:
+        return 'WR(${p.wrPeriod}) ${p.wrOversold}/${p.wrOverbought}';
+      case BacktestStrategy.dmi:
+        return 'DMI(${p.dmiPeriod}) ADX>${p.dmiTrendThreshold}';
+      case BacktestStrategy.multi:
+        return 'MACD(${p.macdFastPeriod},${p.macdSlowPeriod}) RSI(${p.rsiPeriod}) KDJ(${p.kdjPeriod})';
+    }
   }
 
   Widget _buildResultCard() {
@@ -400,7 +730,7 @@ class _BacktestPageState extends State<BacktestPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Summary
+            // 汇总
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -417,8 +747,7 @@ class _BacktestPageState extends State<BacktestPage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Key Metrics
+            // 关键指标
             const Text('关键指标', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const Divider(),
             _buildRow('夏普比率', r.sharpeRatio.toStringAsFixed(2)),
@@ -432,23 +761,26 @@ class _BacktestPageState extends State<BacktestPage> {
             _buildRow('亏损次数', '${r.losingTrades}'),
             _buildRow('初始资金', r.initialCapital.toStringAsFixed(2)),
             _buildRow('最终资金', r.finalCapital.toStringAsFixed(2)),
-
-            // Trade List
+            // 交易记录
             if (r.trades.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Text('交易记录', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const Divider(),
               ...r.trades.take(10).map((t) => ListTile(
                     dense: true,
-                    leading: Icon(t.profit >= 0 ? Icons.arrow_upward : Icons.arrow_downward, color: t.profit >= 0 ? AppColors.success : AppColors.error),
+                    leading: Icon(t.profit >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                        color: t.profit >= 0 ? AppColors.success : AppColors.error),
                     title: Text('${t.isLong ? "多" : "空"} ${t.entryDate} → ${t.exitDate}'),
                     subtitle: Text('入场:${t.entryPrice.toStringAsFixed(2)} 出场:${t.exitPrice.toStringAsFixed(2)}'),
-                    trailing: Text('${t.profit >= 0 ? "+" : ""}${t.profit.toStringAsFixed(2)}', style: TextStyle(color: t.profit >= 0 ? AppColors.success : AppColors.error)),
+                    trailing: Text('${t.profit >= 0 ? "+" : ""}${t.profit.toStringAsFixed(2)}',
+                        style: TextStyle(color: t.profit >= 0 ? AppColors.success : AppColors.error)),
                   )),
-              if (r.trades.length > 10) Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text('还有 ${r.trades.length - 10} 条记录...', style: const TextStyle(color: AppColors.textSecondary)),
-              ),
+              if (r.trades.length > 10)
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text('还有 ${r.trades.length - 10} 条记录...',
+                      style: const TextStyle(color: AppColors.textSecondary)),
+                ),
             ],
           ],
         ),
@@ -479,22 +811,218 @@ class _BacktestPageState extends State<BacktestPage> {
     );
   }
 
-  Widget _buildParamSummary() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+  void _runBacktest(StockLoaded state) async {
+    final filteredQuotes = _getFilteredQuotes(state);
+    if (filteredQuotes.isEmpty) {
+      _ensureDataForRange(state);
+      return;
+    }
+
+    if (_showBatchPanel) {
+      await _runBatchBacktest(filteredQuotes);
+    } else {
+      await _runSingleBacktest(filteredQuotes);
+    }
+  }
+
+  Future<void> _runSingleBacktest(List<StockQuote> filteredQuotes) async {
+    setState(() => _isRunning = true);
+    final initialCapital = double.tryParse(_initialCapitalController.text) ?? 100000;
+    final feeRate = double.tryParse(_feeRateController.text) ?? 0.001;
+    final positionRatio = double.tryParse(_positionRatioController.text) ?? 1.0;
+
+    try {
+      final result = await Future(() => BacktestCalculator.runBacktest(
+        filteredQuotes,
+        _selectedStrategy,
+        initialCapital: initialCapital,
+        feeRate: feeRate,
+        positionRatio: positionRatio,
+        params: _params,
+      ));
+      if (mounted) {
+        setState(() {
+          _result = result;
+          _isRunning = false;
+        });
+      }
+    } catch (e, st) {
+      debugPrint('Backtest error: $e\n$st');
+      if (mounted) {
+        setState(() => _isRunning = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('回测出错: $e')));
+      }
+    }
+  }
+
+  Future<void> _runBatchBacktest(List<StockQuote> filteredQuotes) async {
+    if (_presetCombos.isEmpty) {
+      _buildDefaultPresets();
+    }
+
+    setState(() {
+      _isRunning = true;
+      _batchResults = [];
+    });
+
+    final initialCapital = double.tryParse(_initialCapitalController.text) ?? 100000;
+    final feeRate = double.tryParse(_feeRateController.text) ?? 0.001;
+    final positionRatio = double.tryParse(_positionRatioController.text) ?? 1.0;
+
+    final results = await Future.wait(
+      _presetCombos.map((params) => Future(() => BacktestCalculator.runBacktest(
+        filteredQuotes,
+        _selectedStrategy,
+        initialCapital: initialCapital,
+        feeRate: feeRate,
+        positionRatio: positionRatio,
+        params: params,
+      ))),
+    );
+
+    if (mounted) {
+      setState(() {
+        _batchResults = List.generate(_presetCombos.length, (i) => _ParamComboResult(_presetCombos[i], results[i]));
+        _isRunning = false;
+      });
+    }
+  }
+
+  List<StockQuote> _getFilteredQuotes(StockLoaded state) {
+    return state.stockData.quotes.where((q) {
+      final d = DateTime.parse(q.date);
+      return !d.isBefore(_startDate) && !d.isAfter(_endDate);
+    }).toList();
+  }
+
+  Future<void> _selectDate(bool isStart) async {
+    final initial = isStart ? _startDate : _endDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        if (picked.isAfter(_endDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('开始日期不能晚于结束日期')),
+          );
+          return;
+        }
+        _startDate = picked;
+      } else {
+        if (picked.isBefore(_startDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('结束日期不能早于开始日期')),
+          );
+          return;
+        }
+        _endDate = picked;
+      }
+      _result = null;
+      _batchResults = [];
+    });
+  }
+
+  Future<void> _ensureDataForRange(StockLoaded state) async {
+    setState(() => _isLoadingData = true);
+    final existingQuotes = state.stockData.quotes;
+    DateTime? existingStart;
+    DateTime? existingEnd;
+    if (existingQuotes.isNotEmpty) {
+      existingStart = DateTime.parse(existingQuotes.first.date);
+      existingEnd = DateTime.parse(existingQuotes.last.date);
+    }
+
+    bool needFetch = existingQuotes.isEmpty;
+    if (!needFetch && existingStart != null && _startDate.isBefore(existingStart)) needFetch = true;
+    if (!needFetch && existingEnd != null && _endDate.isAfter(existingEnd)) needFetch = true;
+
+    if (needFetch) {
+      final start = _dateFormat.format(_startDate);
+      final end = _dateFormat.format(_endDate);
+      if (mounted) {
+        context.read<StockBloc>().add(LoadStock(
+          state.stockData.symbol,
+          startDate: start,
+          endDate: end,
+        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('正在拉取 $start ~ $end 数据...')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('数据已覆盖所选时间段，直接回测')),
+      );
+    }
+    setState(() => _isLoadingData = false);
+  }
+
+  void _showParamInfoSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('本次参数', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            const Divider(),
-            _buildRow('策略', _getStrategyName(_selectedStrategy)),
-            _buildRow('初始资金', _initialCapitalController.text),
-            _buildRow('费率', _feeRateController.text),
-            _buildRow('仓位比例', _positionRatioController.text),
+            const Text('参数说明', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            const Text('费率：买卖双向收取，一般为0.0005~0.001（万0.5~千1）', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text('仓位：每次用于买入的比例，1.0=全仓，0.5=半仓', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text('多参数比较：自动生成4组参数同时回测，点击结果行可查看详细', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text('点击策略参数后，可自定义任意指标周期和阈值进行精细化回测', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('知道了'),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  String _getStrategyName(BacktestStrategy s) {
+    return switch (s) {
+      BacktestStrategy.macd => 'MACD',
+      BacktestStrategy.kdj => 'KDJ',
+      BacktestStrategy.rsi => 'RSI',
+      BacktestStrategy.boll => 'BOLL',
+      BacktestStrategy.ma => 'MA均线',
+      BacktestStrategy.wr => 'WR威廉',
+      BacktestStrategy.dmi => 'DMI',
+      BacktestStrategy.multi => '多指标综合',
+    };
+  }
+
+  String _getStrategyDescription(BacktestStrategy s) {
+    return switch (s) {
+      BacktestStrategy.macd => 'MACD金叉买入，死叉卖出',
+      BacktestStrategy.kdj => 'KDJ金叉买入，死叉卖出，可调超买超卖阈值',
+      BacktestStrategy.rsi => 'RSI<超卖值买入，RSI>超买值卖出',
+      BacktestStrategy.boll => '价格突破BOLL下轨买入，跌破上轨卖出',
+      BacktestStrategy.ma => 'MA多头排列买入，空头排列卖出',
+      BacktestStrategy.wr => 'WR威廉指标超卖区买入，超买区卖出',
+      BacktestStrategy.dmi => 'DMI趋势跟随，ADX确认趋势强度',
+      BacktestStrategy.multi => 'MACD + KDJ + RSI 三指标共振',
+    };
+  }
+}
+
+class _ParamComboResult {
+  final StrategyParams params;
+  final BacktestResult result;
+  _ParamComboResult(this.params, this.result);
 }
