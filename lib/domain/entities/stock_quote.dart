@@ -266,6 +266,84 @@ class TurtleDetails extends Equatable {
   List<Object?> get props => [currentPrice, high20, low20, high10, low10, atr, atr14, entryPrice, stopLoss, takeProfit, riskReward, positionSize, signal, signalExplanation, stepDetails];
 }
 
+/// 海龟交易回测结果
+class TurtleBacktestResult extends Equatable {
+  final int totalTrades;
+  final int winningTrades;
+  final int losingTrades;
+  final double winRate;
+  final double totalProfit;
+  final double maxDrawdownPercent;
+  final double sharpeRatio;
+  final double avgWin;
+  final double avgLoss;
+  final double profitFactor;
+  final List<TurtleTrade> trades;
+  final double initialCapital;
+  final double finalCapital;
+  final TurtleSignalType currentSignal;  // 最后一根K线的信号
+  final TurtleDetails currentDetails;    // 最后一根K线的详细信息
+
+  const TurtleBacktestResult({
+    required this.totalTrades,
+    required this.winningTrades,
+    required this.losingTrades,
+    required this.winRate,
+    required this.totalProfit,
+    required this.maxDrawdownPercent,
+    required this.sharpeRatio,
+    required this.avgWin,
+    required this.avgLoss,
+    required this.profitFactor,
+    required this.trades,
+    required this.initialCapital,
+    required this.finalCapital,
+    required this.currentSignal,
+    required this.currentDetails,
+  });
+
+  @override
+  List<Object?> get props => [totalTrades, winningTrades, losingTrades, winRate, totalProfit, maxDrawdownPercent, sharpeRatio, avgWin, avgLoss, profitFactor, trades, initialCapital, finalCapital, currentSignal, currentDetails];
+}
+
+/// 海龟交易单笔记录
+class TurtleTrade extends Equatable {
+  final String entryDate;
+  final double entryPrice;
+  final String exitDate;
+  final double exitPrice;
+  final int quantity;
+  final bool isLong;
+  final double profit;
+  final double profitPercent;
+  final int holdingDays;
+  final double atrAtEntry;    // 入场时的ATR
+  final double atrAtExit;     // 出场时的ATR
+  final double stopLoss;      // 入场时设置的止损价
+  final double takeProfit;     // 入场时设置的止盈价
+  final String exitReason;    // 出场原因：止损/止盈/趋势破坏
+
+  const TurtleTrade({
+    required this.entryDate,
+    required this.entryPrice,
+    required this.exitDate,
+    required this.exitPrice,
+    required this.quantity,
+    required this.isLong,
+    required this.profit,
+    required this.profitPercent,
+    required this.holdingDays,
+    required this.atrAtEntry,
+    required this.atrAtExit,
+    required this.stopLoss,
+    required this.takeProfit,
+    required this.exitReason,
+  });
+
+  @override
+  List<Object?> get props => [entryDate, entryPrice, exitDate, exitPrice, quantity, isLong, profit, profitPercent, holdingDays, atrAtEntry, atrAtExit, stopLoss, takeProfit, exitReason];
+}
+
 class Trade extends Equatable {
   final String entryDate;
   final double entryPrice;
