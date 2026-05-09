@@ -6,11 +6,16 @@ class TurtleTradingCalculator {
   static TurtleBacktestResult runTurtleBacktest(
     List<StockQuote> quotes, {
     int period = 20,
+    int entryPeriod = 20,     // 入场周期（突破该周期高点做多/低点做空）
+    int exitPeriod = 10,      // 离场周期（跌破该周期低点做多/突破高点做空）
     double accountBalance = 100000,
     double riskPercent = 1.0,
     double feeRate = 0.001,
-    double stopLossN = 2.0,   // N倍止损（海龟标准2N）
-    double profitTargetN = 4.0, // N倍止盈（海龟标准2R=4N）
+    double stopLossN = 2.0,   // N倍止损
+    double profitTargetN = 4.0, // N倍止盈
+    double trailingStopAtr = 2.0, // 追踪止损ATR倍数（跌破N日最低/突破N日最高）
+    int trailingStopPeriod = 20, // 追踪止损周期
+    int maxPosition = 4,      // 最大持仓份数
   }) {
     if (quotes.length < period + 1) {
       return _emptyTurtleResult(accountBalance);
@@ -52,18 +57,26 @@ class TurtleTradingCalculator {
     for (var i = period; i < quotes.length; i++) {
       final n = trueRanges[i - 1]; // quotes[i] 对应的N值
 
-      // 计算最近 period 日的高低点
-      double high20 = quotes[i - period].high;
-      double low20 = quotes[i - period].low;
-      double high10 = quotes[i - 10].high;
-      double low10 = quotes[i - 10].low;
-      for (var j = i - period + 1; j < i; j++) {
-        if (quotes[j].high > high20) high20 = quotes[j].high;
-        if (quotes[j].low < low20) low20 = quotes[j].low;
+      // 计算最近 entryPeriod 日的高低点（入场参考）
+      double highEntry = quotes[i - entryPeriod].high;
+      double lowEntry = quotes[i - entryPeriod].low;
+      double highExit = quotes[i - exitPeriod].high;
+      double lowExit = quotes[i - exitPeriod].low;
+      for (var j = i - entryPeriod + 1; j < i; j++) {
+        if (quotes[j].high > highEntry) highEntry = quotes[j].high;
+        if (quotes[j].low < lowEntry) lowEntry = quotes[j].low;
       }
-      for (var j = i - 10 + 1; j < i; j++) {
-        if (quotes[j].high > high10) high10 = quotes[j].high;
-        if (quotes[j].low < low10) low10 = quotes[j].low;
+      for (var j = i - exitPeriod + 1; j < i; j++) {
+        if (quotes[j].high > highExit) highExit = quotes[j].high;
+        if (quotes[j].low < lowExit) lowExit = quotes[j].low;
+      }
+
+      // 追踪止损周期的高低点
+      double trailingHigh = quotes[i - trailingStopPeriod].high;
+      double trailingLow = quotes[i - trailingStopPeriod].low;
+      for (var j = i - trailingStopPeriod + 1; j < i; j++) {
+        if (quotes[j].high > trailingHigh) trailingHigh = quotes[j].high;
+        if (quotes[j].low < trailingLow) trailingLow = quotes[j].low;
       }
 
       final price = quotes[i].close;
@@ -94,14 +107,25 @@ class TurtleTradingCalculator {
           }
         }
 
-        // 趋势破坏出场（10日低/高）
+        // 趋势破坏出场（exitPeriod日低/高）
         if (!shouldExit) {
-          if (isLong! && price <= low10) {
+          if (isLong! && price <= lowExit) {
             shouldExit = true;
             exitReason = '趋势破坏';
-          } else if (!isLong! && price >= high10) {
+          } else if (!isLong! && price >= highExit) {
             shouldExit = true;
             exitReason = '趋势破坏';
+          }
+        }
+
+        // 追踪止损出场（跌破 trailingStopPeriod 日最低 / 突破最高）
+        if (!shouldExit) {
+          if (isLong! && price <= trailingLow - (trailingStopAtr - 1) * atr) {
+            shouldExit = true;
+            exitReason = '追踪止损';
+          } else if (!isLong! && price >= trailingHigh + (trailingStopAtr - 1) * atr) {
+            shouldExit = true;
+            exitReason = '追踪止损';
           }
         }
 
@@ -169,7 +193,7 @@ class TurtleTradingCalculator {
           if (quotes[i].open >= limitUp || quotes[i].open <= limitDown) continue;
         }
 
-        if (price > high20) {
+        if (price > highEntry) {
           // 做多入场
           isLong = true;
           entryPrice = price;
@@ -178,9 +202,9 @@ class TurtleTradingCalculator {
           stopLoss = price - stopLossN * n;
           takeProfit = price + profitTargetN * n;
           entryIdx = i;
-          high20AtEntry = high20;
-          low20AtEntry = low20;
-        } else if (price < low20) {
+          high20AtEntry = highEntry;
+          low20AtEntry = lowEntry;
+        } else if (price < lowEntry) {
           // 做空入场
           isLong = false;
           entryPrice = price;
@@ -189,8 +213,8 @@ class TurtleTradingCalculator {
           stopLoss = price + stopLossN * n;
           takeProfit = price - profitTargetN * n;
           entryIdx = i;
-          high20AtEntry = high20;
-          low20AtEntry = low20;
+          high20AtEntry = highEntry;
+          low20AtEntry = lowEntry;
         }
       }
     }
@@ -239,10 +263,10 @@ class TurtleTradingCalculator {
       positionSize: currentAtr > 0 ? (accountBalance * (riskPercent / 100)) / (currentAtr * stopLossN) : 0,
       signal: currentSignal,
       signalExplanation: currentSignal == TurtleSignalType.longBreakout
-          ? '价格突破20日高点(${currentHigh20.toStringAsFixed(2)})，做多信号'
+          ? '价格突破${entryPeriod}日高点(${currentHigh20.toStringAsFixed(2)})，做多信号'
           : currentSignal == TurtleSignalType.shortBreakout
-              ? '价格跌破20日低点(${currentLow20.toStringAsFixed(2)})，做空信号'
-              : '价格未突破20日高低点，等待信号',
+              ? '价格跌破${entryPeriod}日低点(${currentLow20.toStringAsFixed(2)})，做空信号'
+              : '价格未突破${entryPeriod}日高低点，等待信号',
       stepDetails: [],
     );
 
@@ -313,7 +337,16 @@ class TurtleTradingCalculator {
   }
 
   /// 计算海龟交易信号（原有方法，仅返回最后一根K线信号）
-  static TurtleDetails calculate(List<StockQuote> quotes, {int period = 20, double accountBalance = 100000, double riskPercent = 1.0}) {
+  static TurtleDetails calculate(
+    List<StockQuote> quotes, {
+    int period = 20,
+    int entryPeriod = 20,
+    int exitPeriod = 10,
+    double accountBalance = 100000,
+    double riskPercent = 1.0,
+    double stopLossN = 2.0,
+    double profitTargetN = 4.0,
+  }) {
     if (quotes.length < period) {
       return _emptyDetails();
     }
@@ -346,22 +379,22 @@ class TurtleTradingCalculator {
     }
     final atr14 = sumN14 / 14;
 
-    // 计算最近20日高低点
-    final last20 = quotes.sublist(quotes.length - period);
-    double high20 = last20[0].high;
-    double low20 = last20[0].low;
-    for (final q in last20) {
+    // 计算最近 entryPeriod 日高低点
+    final lastEntry = quotes.sublist(quotes.length - entryPeriod);
+    double high20 = lastEntry[0].high;
+    double low20 = lastEntry[0].low;
+    for (final q in lastEntry) {
       if (q.high > high20) high20 = q.high;
       if (q.low < low20) low20 = q.low;
     }
 
-    // 计算最近10日高低点
-    final last10 = quotes.sublist(quotes.length - 10);
-    double high10 = last10[0].high;
-    double low10 = last10[0].low;
-    for (final q in last10) {
-      if (q.high > high10) high10 = q.high;
-      if (q.low < low10) low10 = q.low;
+    // 计算最近 exitPeriod 日高低点
+    final lastExit = quotes.sublist(quotes.length - exitPeriod);
+    double highExit = lastExit[0].high;
+    double lowExit = lastExit[0].low;
+    for (final q in lastExit) {
+      if (q.high > highExit) highExit = q.high;
+      if (q.low < lowExit) lowExit = q.low;
     }
 
     final currentPrice = quotes.last.close;
@@ -374,30 +407,31 @@ class TurtleTradingCalculator {
 
     if (currentPrice > high20) {
       signal = TurtleSignalType.longBreakout;
-      explanation = '价格突破20日高点($high20)，做多信号';
+      explanation = '价格突破${entryPeriod}日高点($high20)，做多信号';
       entryPrice = high20;
       steps = [
-        '1. 入场：买入价 = 突破20日高点 $high20',
-        '2. 止损：买入价 - 2N = ${(high20 - 2 * atr).toStringAsFixed(2)}',
-        '3. 止盈：2倍风险收益',
-        '4. 仓位：每份风险 = 账户1% / N值',
-        '5. 风险管理：总仓位不超过4份',
+        '1. 入场：买入价 = 突破${entryPeriod}日高点 $high20',
+        '2. 止损：买入价 - ${stopLossN}N = ${(high20 - stopLossN * atr).toStringAsFixed(2)}',
+        '3. 止盈：买入价 + ${profitTargetN}N = ${(high20 + profitTargetN * atr).toStringAsFixed(2)}',
+        '4. 仓位：每份风险 = 账户${riskPercent.toStringAsFixed(1)}% / N值',
+        '5. 离场：跌破${exitPeriod}日低点自动退出',
       ];
     } else if (currentPrice < low20) {
       signal = TurtleSignalType.shortBreakout;
-      explanation = '价格跌破20日低点($low20)，做空信号';
+      explanation = '价格跌破${entryPeriod}日低点($low20)，做空信号';
       entryPrice = low20;
       steps = [
-        '1. 入场：卖出价 = 跌破20日低点 $low20',
-        '2. 止损：卖出价 + 2N = ${(low20 + 2 * atr).toStringAsFixed(2)}',
-        '3. 止盈：2倍风险收益',
-        '4. 仓位：每份风险 = 账户1% / N值',
+        '1. 入场：卖出价 = 跌破${entryPeriod}日低点 $low20',
+        '2. 止损：卖出价 + ${stopLossN}N = ${(low20 + stopLossN * atr).toStringAsFixed(2)}',
+        '3. 止盈：卖出价 - ${profitTargetN}N = ${(low20 - profitTargetN * atr).toStringAsFixed(2)}',
+        '4. 仓位：每份风险 = 账户${riskPercent.toStringAsFixed(1)}% / N值',
+        '5. 离场：突破${exitPeriod}日高点自动退出',
       ];
     } else {
       signal = TurtleSignalType.none;
-      explanation = '价格未突破20日高低点，等待信号';
+      explanation = '价格未突破${entryPeriod}日高低点，等待信号';
       entryPrice = currentPrice;
-      steps = ['当前无信号，等待价格突破20日高点或跌破20日低点'];
+      steps = ['当前无信号，等待价格突破${entryPeriod}日高点或跌破${entryPeriod}日低点'];
     }
 
     // 计算仓位大小（每份风险 = 账户riskPercent%）
@@ -422,14 +456,14 @@ class TurtleTradingCalculator {
       currentPrice: currentPrice,
       high20: high20,
       low20: low20,
-      high10: high10,
-      low10: low10,
+      high10: highExit,
+      low10: lowExit,
       atr: atr,
       atr14: atr14,
       entryPrice: entryPrice,
       stopLoss: stopLoss,
       takeProfit: takeProfit,
-      riskReward: riskReward,
+      riskReward: atr > 0 ? (entryPrice - stopLoss).abs() / atr : 0.0,
       positionSize: positionSize,
       signal: signal,
       signalExplanation: explanation,
