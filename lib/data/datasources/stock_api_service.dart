@@ -205,60 +205,65 @@ class StockApiService {
 
       if (response.statusCode == 200) {
         _cacheResponse(url, response.body, response.headers, 'Tencent Backup');
-        final json = jsonDecode(response.body);
-        final data = json['data']?[ '${marketCode}$stockCode'] as Map<String, dynamic>?;
-        final qfqday = data?['qfqday'] as List<dynamic>?;
-
-        if (qfqday != null && qfqday.isNotEmpty) {
-          final quotes = <StockQuote>[];
-          for (final item in qfqday) {
-            if (item is List && item.length >= 6) {
-              quotes.add(StockQuote(
-                date: item[0].toString(),
-                open: (item[1] as num).toDouble(),
-                high: (item[2] as num).toDouble(),
-                low: (item[3] as num).toDouble(),
-                close: (item[4] as num).toDouble(),
-                volume: (item[5] as num).toInt(),
-              ));
-            }
-          }
-          if (quotes.isNotEmpty) {
-            return StockData(symbol: normalized, name: stockName, quotes: quotes);
-          }
-        }
+        return _parseTencentBackupResponse(response.body, normalized, stockName);
       }
     } catch (e) {
       print('[API DEGRADATION] Tencent Backup API failed: $e');
-      // Fall through to error
     }
 
     throw Exception('无法获取股票数据');
   }
 
+  num _toNum(dynamic value) {
+    if (value is num) return value;
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
   Future<StockData> _parseTencentBackupResponse(String body, String normalized, String stockName) async {
     final json = jsonDecode(body);
-    final normalizedLower = normalized.toLowerCase();
-    final data = json['data']?[normalizedLower] as Map<String, dynamic>?;
-    final qfqday = data?['qfqday'] as List<dynamic>?;
 
-    if (qfqday != null && qfqday.isNotEmpty) {
-      final quotes = <StockQuote>[];
-      for (final item in qfqday) {
-        if (item is List && item.length >= 6) {
-          quotes.add(StockQuote(
-            date: item[0].toString(),
-            open: (item[1] as num).toDouble(),
-            high: (item[2] as num).toDouble(),
-            low: (item[3] as num).toDouble(),
-            close: (item[4] as num).toDouble(),
-            volume: (item[5] as num).toInt(),
-          ));
-        }
+    // The API returns data under key like "sh600399", not "sh.600399"
+    final marketCode = normalized.contains('.')
+        ? normalized.split('.')[0]  // "sh" from "sh.600399"
+        : (normalizeSymbol(normalized).contains('.')
+            ? normalizeSymbol(normalized).split('.')[0]
+            : 'sh');
+    final stockCode = normalized.contains('.') ? normalized.split('.')[1] : normalized;
+    final apiKey = marketCode + stockCode;  // e.g., "sh600399"
+
+    // Try the correct key format first, then fallback to other methods
+    final data = json['data']?[apiKey]
+                ?? json['data']?[normalized.toLowerCase()]
+                ?? json['data']?[normalized]
+                ?? json['data'];
+    if (data == null) throw Exception('无法解析备份API数据');
+
+    List<dynamic>? qfqday = data is List ? data as List<dynamic> : null;
+    if (qfqday == null) {
+      final dataMap = data as Map<String, dynamic>?;
+      qfqday = dataMap?['qfqday'] as List<dynamic>?;
+      qfqday ??= dataMap?['day'] as List<dynamic>?;
+      qfqday ??= dataMap?.values.firstOrNull as List<dynamic>?;
+    }
+
+    if (qfqday == null || qfqday.isEmpty) throw Exception('无法解析备份API数据');
+
+    final quotes = <StockQuote>[];
+    for (final item in qfqday) {
+      if (item is List && item.length >= 6) {
+        quotes.add(StockQuote(
+          date: item[0].toString(),
+          open: _toNum(item[1]).toDouble(),
+          high: _toNum(item[2]).toDouble(),
+          low: _toNum(item[3]).toDouble(),
+          close: _toNum(item[4]).toDouble(),
+          volume: _toNum(item[5]).toInt(),
+        ));
       }
-      if (quotes.isNotEmpty) {
-        return StockData(symbol: normalized, name: stockName, quotes: quotes);
-      }
+    }
+    if (quotes.isNotEmpty) {
+      return StockData(symbol: normalized, name: stockName, quotes: quotes);
     }
     throw Exception('无法解析备份API数据');
   }

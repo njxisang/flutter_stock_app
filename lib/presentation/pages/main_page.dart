@@ -500,19 +500,23 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildChart(StockLoaded state) {
-    // 顶部 Tab 控制主图类型（目前暂时都渲染 K 线，6 个 Tab 代表不同时间维度）
     final chartTab = context.watch<ChartCubit>().state.currentTab;
-    // 底部 Chip 控制副图指标
     final indicatorTab = context.watch<ChartCubit>().state.indicatorTab;
 
     final mainChart = _buildMainChart(chartTab, state);
     final indicatorChart = _buildIndicatorChart(indicatorTab, state);
 
+    // indicatorTab == 0 (MACD): 保持 K线 + MACD 上下分区布局
+    // indicatorTab >= 1 (RSI/KDJ/BOLL/MA/WR/DMI): 全高 K线 + 全高指标图
+    final isMacdMode = indicatorTab == 0;
+
     return Column(
       children: [
-        Expanded(flex: 3, child: mainChart),
-        const Divider(height: 1, color: AppColors.border),
-        Expanded(flex: 1, child: indicatorChart),
+        Expanded(flex: isMacdMode ? 10 : 10, child: mainChart),
+        if (!isMacdMode) ...[
+          const Divider(height: 1, color: AppColors.border),
+          Expanded(flex: 6, child: indicatorChart),
+        ],
       ],
     );
   }
@@ -579,8 +583,22 @@ class _MainPageState extends State<MainPage> {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
+    // 动态计算范围
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final d in displayData) {
+      if (d.dif < minY) minY = d.dif;
+      if (d.dif > maxY) maxY = d.dif;
+      if (d.dea < minY) minY = d.dea;
+      if (d.dea > maxY) maxY = d.dea;
+      if (d.macd < minY) minY = d.macd;
+      if (d.macd > maxY) maxY = d.macd;
+    }
+    final pad = (maxY - minY) * 0.15;
+    minY = minY - pad;
+    maxY = maxY + pad;
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -597,13 +615,22 @@ class _MainPageState extends State<MainPage> {
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dif)).toList(),
                     color: AppColors.difColor,
                     isCurved: true,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.dea)).toList(),
                     color: AppColors.deaColor,
                     isCurved: true,
+                    barWidth: 1.5,
                   ),
                 ],
+                minY: minY,
+                maxY: maxY,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(y: 0, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                  ],
+                ),
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
@@ -619,8 +646,18 @@ class _MainPageState extends State<MainPage> {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
+    // 动态计算范围，留出上下边距
+    double minY = 0, maxY = 100;
+    for (final d in displayData) {
+      if (d.rsi < minY) minY = d.rsi;
+      if (d.rsi > maxY) maxY = d.rsi;
+    }
+    final pad = (maxY - minY) * 0.15;
+    minY = (minY - pad).clamp(0, 100);
+    maxY = (maxY + pad).clamp(0, 100);
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -637,10 +674,18 @@ class _MainPageState extends State<MainPage> {
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.rsi)).toList(),
                     color: AppColors.primary,
                     isCurved: true,
+                    barWidth: 1.5,
                   ),
                 ],
-                minY: 0,
-                maxY: 100,
+                minY: minY,
+                maxY: maxY,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(y: 50, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                    HorizontalLine(y: 30, color: AppColors.gridLine, strokeWidth: 0.5, dashArray: [2, 4]),
+                    HorizontalLine(y: 70, color: AppColors.gridLine, strokeWidth: 0.5, dashArray: [2, 4]),
+                  ],
+                ),
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
@@ -656,8 +701,22 @@ class _MainPageState extends State<MainPage> {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
+    // 动态计算范围，留出上下边距
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final d in displayData) {
+      if (d.k < minY) minY = d.k;
+      if (d.k > maxY) maxY = d.k;
+      if (d.d < minY) minY = d.d;
+      if (d.d > maxY) maxY = d.d;
+      if (d.j < minY) minY = d.j;
+      if (d.j > maxY) maxY = d.j;
+    }
+    final pad = (maxY - minY) * 0.15;
+    minY = minY - pad;
+    maxY = maxY + pad;
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -673,16 +732,27 @@ class _MainPageState extends State<MainPage> {
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.k)).toList(),
                     color: AppColors.kColor,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.d)).toList(),
                     color: AppColors.dColor,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.j)).toList(),
                     color: AppColors.jColor,
+                    barWidth: 1.5,
                   ),
                 ],
+                minY: minY,
+                maxY: maxY,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(y: 80, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                    HorizontalLine(y: 20, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                  ],
+                ),
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
@@ -699,8 +769,26 @@ class _MainPageState extends State<MainPage> {
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
     final displayQuotes = quotes.sublist(quotes.length - displayData.length);
 
+    // 动态计算范围
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final d in displayData) {
+      if (d.upper < minY) minY = d.upper;
+      if (d.upper > maxY) maxY = d.upper;
+      if (d.middle < minY) minY = d.middle;
+      if (d.middle > maxY) maxY = d.middle;
+      if (d.lower < minY) minY = d.lower;
+      if (d.lower > maxY) maxY = d.lower;
+    }
+    for (final q in displayQuotes) {
+      if (q.close < minY) minY = q.close;
+      if (q.close > maxY) maxY = q.close;
+    }
+    final pad = (maxY - minY) * 0.1;
+    minY = minY - pad;
+    maxY = maxY + pad;
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -717,30 +805,35 @@ class _MainPageState extends State<MainPage> {
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.upper)).toList(),
                     color: AppColors.bollUpper,
                     isCurved: true,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.middle)).toList(),
                     color: AppColors.bollMiddle,
                     isCurved: true,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.lower)).toList(),
                     color: AppColors.bollLower,
                     isCurved: true,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayQuotes.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.close)).toList(),
                     color: AppColors.textPrimary,
+                    barWidth: 1.2,
                   ),
                 ],
                 betweenBarsData: [
-                  // 在上轨(0)和下轨(2)之间填充带状
                   BetweenBarsData(
                     fromIndex: 0,
                     toIndex: 2,
                     color: AppColors.bollUpper.withOpacity(0.08),
                   ),
                 ],
+                minY: minY,
+                maxY: maxY,
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
@@ -756,8 +849,21 @@ class _MainPageState extends State<MainPage> {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final d in displayData) {
+      if (d.ma5 < minY) minY = d.ma5;
+      if (d.ma5 > maxY) maxY = d.ma5;
+      if (d.ma10 < minY) minY = d.ma10;
+      if (d.ma10 > maxY) maxY = d.ma10;
+      if (d.ma20 < minY) minY = d.ma20;
+      if (d.ma20 > maxY) maxY = d.ma20;
+    }
+    final pad = (maxY - minY) * 0.15;
+    minY = minY - pad;
+    maxY = maxY + pad;
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -773,16 +879,21 @@ class _MainPageState extends State<MainPage> {
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma5)).toList(),
                     color: AppColors.ma5Color,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma10)).toList(),
                     color: AppColors.ma10Color,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.ma20)).toList(),
                     color: AppColors.ma20Color,
+                    barWidth: 1.5,
                   ),
                 ],
+                minY: minY,
+                maxY: maxY,
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
@@ -798,8 +909,20 @@ class _MainPageState extends State<MainPage> {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
+    // 动态计算范围，防止数据超出固定边界
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final d in displayData) {
+      if (d.wr6 < minY) minY = d.wr6;
+      if (d.wr6 > maxY) maxY = d.wr6;
+      if (d.wr10 < minY) minY = d.wr10;
+      if (d.wr10 > maxY) maxY = d.wr10;
+    }
+    final pad = (maxY - minY) * 0.15;
+    minY = minY - pad;
+    maxY = maxY + pad;
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -815,14 +938,22 @@ class _MainPageState extends State<MainPage> {
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr6)).toList(),
                     color: AppColors.wr6Color,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.wr10)).toList(),
                     color: AppColors.wr10Color,
+                    barWidth: 1.5,
                   ),
                 ],
-                minY: -100,
-                maxY: 0,
+                minY: minY,
+                maxY: maxY,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(y: -20, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                    HorizontalLine(y: -80, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                  ],
+                ),
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),
@@ -838,8 +969,22 @@ class _MainPageState extends State<MainPage> {
     if (data.isEmpty) return const Center(child: Text('数据不足'));
     final displayData = data.length > 100 ? data.sublist(data.length - 100) : data;
 
+    // 动态计算范围
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final d in displayData) {
+      if (d.pdi < minY) minY = d.pdi;
+      if (d.pdi > maxY) maxY = d.pdi;
+      if (d.mdi < minY) minY = d.mdi;
+      if (d.mdi > maxY) maxY = d.mdi;
+      if (d.adx < minY) minY = d.adx;
+      if (d.adx > maxY) maxY = d.adx;
+    }
+    final pad = (maxY - minY) * 0.15;
+    minY = minY - pad;
+    maxY = maxY + pad;
+
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(left: 36, right: 8, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: AppColors.chartBackground,
         borderRadius: BorderRadius.circular(8),
@@ -855,16 +1000,26 @@ class _MainPageState extends State<MainPage> {
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.pdi)).toList(),
                     color: AppColors.pdiColor ?? AppColors.primary,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.mdi)).toList(),
                     color: AppColors.mdiColor ?? AppColors.bearish,
+                    barWidth: 1.5,
                   ),
                   LineChartBarData(
                     spots: displayData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.adx)).toList(),
                     color: AppColors.adxColor ?? AppColors.textSecondary,
+                    barWidth: 1.5,
                   ),
                 ],
+                minY: minY,
+                maxY: maxY,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(y: 0, color: AppColors.gridLine, strokeWidth: 0.8, dashArray: [4, 4]),
+                  ],
+                ),
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(show: false),
                 borderData: FlBorderData(show: false),

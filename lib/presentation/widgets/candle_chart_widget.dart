@@ -251,7 +251,7 @@ class _CandleChartWidgetState extends State<CandleChartWidget> {
         final rightPad = w > 400 ? 52.0 : 44.0;
         const topPad = 8.0;
         const botPad = 24.0;
-        final volH = _showVol ? (chartH > 280 ? 48.0 : 36.0) : 0.0;
+        final volH = _showVol ? (chartH > 280 ? 36.0 : 28.0) : 0.0;
         const volSep = 6.0;
         final chartW = w - leftPad - rightPad;
 

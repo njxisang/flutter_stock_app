@@ -205,8 +205,7 @@ class CandlePainter extends CustomPainter {
 
     double maxVol = 1;
     for (final q in qs) {
-      final v = (q.close - q.open).abs();
-      if (v > maxVol) maxVol = v;
+      if (q.volume > maxVol) maxVol = q.volume.toDouble();
     }
 
     for (var i = 0; i < qs.length; i++) {
@@ -215,7 +214,7 @@ class CandlePainter extends CustomPainter {
       final isUp = q.close >= q.open;
       final col  = isUp ? bullVol  : bearVol;
       final colA = isUp ? bullVolA : bearVolA;
-      final vH   = (volH * 0.85 * ((q.close - q.open).abs() / maxVol)).clamp(1.0, volH * 0.85);
+      final vH   = (volH * 0.9 * (q.volume / maxVol)).clamp(2.0, volH * 0.9);
 
       // Background
       canvas.drawRRect(
@@ -225,7 +224,7 @@ class CandlePainter extends CustomPainter {
         ),
         Paint()..color = colA,
       );
-      // Filled
+      // Filled bar from bottom
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(x - bodyW / 2, volTop + volH - vH, bodyW, vH),
