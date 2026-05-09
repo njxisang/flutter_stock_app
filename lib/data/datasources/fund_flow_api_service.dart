@@ -145,14 +145,14 @@ class FundFlowApiService {
     final market = detectMarket(symbol);
     final secid = market == Market.sh ? '1.$stockCode' : '0.$stockCode';
 
-    final url = 'https://push2.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=60&klt=101&secid=$secid&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63';
+    final url = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=60&klt=101&secid=$secid&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=b2884a393a59ad64002292a3e90d46a5&_=${DateTime.now().millisecondsSinceEpoch}';
 
     try {
       final response = await _client.get(
         Uri.parse(url),
         headers: {
-          'User-Agent': 'Mozilla/5.0',
-          'Referer': 'https://quote.eastmoney.com/',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://data.eastmoney.com/zjlx/detail.html',
         },
       );
 
@@ -166,13 +166,16 @@ class FundFlowApiService {
           final flows = <CapitalFlow>[];
           for (final item in klines) {
             final parts = item.toString().split(',');
-            if (parts.length >= 4) {
+            if (parts.length >= 13) {
+              // 字段顺序（15个字段，参考akshare源码）：
+              // 0=日期, 1=主力净流入, 2=小单净流入, 3=中单净流入, 4=大单净流入,
+              // 5=超大单净流入, 6-10=各档净占比, 11=收盘价, 12=涨跌幅, 13-14=-
               flows.add(CapitalFlow(
                 date: parts[0],
-                bigDealIn: double.tryParse(parts[1]) ?? 0,
-                bigDealOut: double.tryParse(parts[2]) ?? 0,
-                netInflow: double.tryParse(parts[3]) ?? 0,
-                turnoverRate: parts.length > 4 ? (double.tryParse(parts[4]) ?? 0) : 0,
+                bigDealIn: double.tryParse(parts[1]) ?? 0, // 主力净流入（净额）
+                bigDealOut: double.tryParse(parts[2]) ?? 0, // 小单净流入（净额）
+                netInflow: double.tryParse(parts[3]) ?? 0, // 中单净流入（净额）
+                turnoverRate: double.tryParse(parts[12]) ?? 0, // 涨跌幅（字段复用）
               ));
             }
           }
