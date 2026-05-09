@@ -91,6 +91,32 @@ class StockLocalStorage {
     await _prefs.setString(_settingsKey, jsonEncode(settings));
   }
 
+  // ─── 回测参数持久化（U-1）───
+  static const String _backtestParamsKey = 'backtest_params';
+
+  Map<String, dynamic> getBacktestParams() {
+    final json = _prefs.getString(_backtestParamsKey);
+    if (json == null) return {};
+    return jsonDecode(json);
+  }
+
+  Future<void> saveBacktestParams(Map<String, dynamic> params) async {
+    await _prefs.setString(_backtestParamsKey, jsonEncode(params));
+  }
+
+  // ─── 海龟参数持久化（U-1）───
+  static const String _turtleParamsKey = 'turtle_params';
+
+  Map<String, dynamic> getTurtleParams() {
+    final json = _prefs.getString(_turtleParamsKey);
+    if (json == null) return {};
+    return jsonDecode(json);
+  }
+
+  Future<void> saveTurtleParams(Map<String, dynamic> params) async {
+    await _prefs.setString(_turtleParamsKey, jsonEncode(params));
+  }
+
   Future<void> clearCache() async {
     final keys = _prefs.getKeys().where((k) => k.startsWith('cache_')).toList();
     for (final key in keys) {

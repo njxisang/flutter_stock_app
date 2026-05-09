@@ -132,6 +132,61 @@ class StrategyParams {
   );
 }
 
+/// U-1: 序列化支持（JSON → StrategyParams）
+extension StrategyParamsJson on StrategyParams {
+  Map<String, dynamic> toJson() => {
+    'macdFastPeriod': macdFastPeriod, 'macdSlowPeriod': macdSlowPeriod, 'macdSignalPeriod': macdSignalPeriod,
+    'kdjPeriod': kdjPeriod, 'kdjKPeriod': kdjKPeriod, 'kdjDPeriod': kdjDPeriod,
+    'kdjOverbought': kdjOverbought, 'kdjOversold': kdjOversold,
+    'rsiPeriod': rsiPeriod, 'rsiOverbought': rsiOverbought, 'rsiOversold': rsiOversold,
+    'bollPeriod': bollPeriod, 'bollStdDev': bollStdDev,
+    'maShortPeriod': maShortPeriod, 'maMidPeriod': maMidPeriod, 'maLongPeriod': maLongPeriod,
+    'wrPeriod': wrPeriod, 'wrOverbought': wrOverbought, 'wrOversold': wrOversold,
+    'dmiPeriod': dmiPeriod, 'dmiAdxPeriod': dmiAdxPeriod, 'dmiTrendThreshold': dmiTrendThreshold,
+    'cciPeriod': cciPeriod,
+    'stochRsiPeriod': stochRsiPeriod, 'stochRsiKPeriod': stochRsiKPeriod, 'stochRsiDPeriod': stochRsiDPeriod,
+    'volumeMAperiod': volumeMAperiod, 'volumeFilter': volumeFilter,
+  };
+}
+
+StrategyParams strategyParamsFromJson(Map<String, dynamic> json) {
+  return StrategyParams(
+    macdFastPeriod: json['macdFastPeriod'] ?? 12,
+    macdSlowPeriod: json['macdSlowPeriod'] ?? 26,
+    macdSignalPeriod: json['macdSignalPeriod'] ?? 9,
+    kdjPeriod: json['kdjPeriod'] ?? 9,
+    kdjKPeriod: json['kdjKPeriod'] ?? 3,
+    kdjDPeriod: json['kdjDPeriod'] ?? 3,
+    kdjOverbought: json['kdjOverbought'] ?? 80,
+    kdjOversold: json['kdjOversold'] ?? 20,
+    rsiPeriod: json['rsiPeriod'] ?? 14,
+    rsiOverbought: json['rsiOverbought'] ?? 70,
+    rsiOversold: json['rsiOversold'] ?? 30,
+    bollPeriod: json['bollPeriod'] ?? 20,
+    bollStdDev: json['bollStdDev'] ?? 2,
+    maShortPeriod: json['maShortPeriod'] ?? 5,
+    maMidPeriod: json['maMidPeriod'] ?? 10,
+    maLongPeriod: json['maLongPeriod'] ?? 20,
+    wrPeriod: json['wrPeriod'] ?? 10,
+    wrOverbought: json['wrOverbought'] ?? 20,
+    wrOversold: json['wrOversold'] ?? 80,
+    dmiPeriod: json['dmiPeriod'] ?? 14,
+    dmiAdxPeriod: json['dmiAdxPeriod'] ?? 14,
+    dmiTrendThreshold: json['dmiTrendThreshold'] ?? 25,
+    cciPeriod: json['cciPeriod'] ?? 14,
+    stochRsiPeriod: json['stochRsiPeriod'] ?? 14,
+    stochRsiKPeriod: json['stochRsiKPeriod'] ?? 3,
+    stochRsiDPeriod: json['stochRsiDPeriod'] ?? 3,
+    volumeMAperiod: json['volumeMAperiod'] ?? 5,
+    volumeFilter: json['volumeFilter'] ?? false,
+  );
+}
+
+// 别名，方便 backtest_page 调用
+extension StrategyParamsFromJsonExt on StrategyParams {
+  static StrategyParams fromJson(Map<String, dynamic> json) => strategyParamsFromJson(json);
+}
+
 class BacktestConfig {
   final double initialCapital;
   final double feeRate;
@@ -194,6 +249,8 @@ class BacktestCalculator {
     int? entryIndex;  // 记录入场K线索引，用于时间止损计算
     bool isLong = true;
     double peakCapital = capital;
+    // ─── U-4: 资金曲线 ───
+    final capitalHistory = <double>[capital]; // 第0天（入场前）的资金
 
     double totalTrades = 0;
     double winningTrades = 0;
@@ -341,6 +398,8 @@ class BacktestCalculator {
       if (capital > peakCapital) peakCapital = capital;
       final drawdownPercent = peakCapital > 0 ? (peakCapital - capital) / peakCapital * 100 : 0.0;
       if (drawdownPercent > maxDrawdown) maxDrawdown = drawdownPercent;
+      // ─── U-4: 记录每日资金 ───
+      capitalHistory.add(capital);
     }
 
     final winRate = totalTrades > 0 ? winningTrades / totalTrades * 100 : 0;
@@ -890,6 +949,7 @@ class BacktestCalculator {
       trades: [],
       initialCapital: initialCapital,
       finalCapital: initialCapital,
+      capitalHistory: const [],
     );
   }
 }

@@ -24,6 +24,7 @@ dependencies:
 
   # Local Storage
   shared_preferences: ^2.2.2
+  share_plus: ^7.2.1
 
   # Dependency Injection
   get_it: ^7.6.4

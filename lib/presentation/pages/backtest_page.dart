@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_constants.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/stock_quote.dart';
@@ -28,6 +29,13 @@ class _BacktestPageState extends State<BacktestPage> {
   List<_ParamComboResult> _batchResults = [];
   bool _showBatchPanel = false;
 
+  // ─── U-6: 批量比较排序 ───
+  String _sortColumn = '收益率'; // 收益率/胜率/夏普/最大回撤/交易数
+  bool _sortAsc = false;
+
+  // ─── U-7: 交易记录筛选器 ───
+  String _tradeFilter = '全部'; // 全部/盈利/亏损
+
   // ─── 参数编辑 ───
   bool _showAdvancedParams = false;
   StrategyParams _params = const StrategyParams();
@@ -49,6 +57,125 @@ class _BacktestPageState extends State<BacktestPage> {
     _buildDefaultPresets();
     // B-4 Fix: 初始化策略参数 TextEditingController
     _initParamControllers();
+    // U-1: 从本地存储恢复上次参数
+    _loadBacktestParams();
+  }
+
+  void _loadBacktestParams() {
+    try {
+      final bloc = context.read<StockBloc>();
+      final saved = bloc.stockStorage.getBacktestParams();
+      if (saved.isEmpty) return;
+      setState(() {
+        if (saved['strategy'] != null) {
+          _selectedStrategy = BacktestStrategy.values.firstWhere(
+            (e) => e.name == saved['strategy'],
+            orElse: () => _selectedStrategy,
+          );
+        }
+        if (saved['initialCapital'] != null) {
+          _initialCapitalController.text = saved['initialCapital'].toString();
+        }
+        if (saved['feeRate'] != null) {
+          _feeRateController.text = saved['feeRate'].toString();
+        }
+        if (saved['positionRatio'] != null) {
+          _positionRatioController.text = saved['positionRatio'].toString();
+        }
+        if (saved['startDate'] != null) {
+          _startDate = DateTime.tryParse(saved['startDate']) ?? _startDate;
+        }
+        if (saved['endDate'] != null) {
+          _endDate = DateTime.tryParse(saved['endDate']) ?? _endDate;
+        }
+        if (saved['params'] != null) {
+          _params = strategyParamsFromJson(saved['params']);
+          // 同步更新 controller 显示值
+          _syncControllersFromParams();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _syncControllersFromParams() {
+    _paramControllers['macdFastPeriod']?.text    = _params.macdFastPeriod.toString();
+    _paramControllers['macdSlowPeriod']?.text    = _params.macdSlowPeriod.toString();
+    _paramControllers['macdSignalPeriod']?.text  = _params.macdSignalPeriod.toString();
+    _paramControllers['kdjPeriod']?.text        = _params.kdjPeriod.toString();
+    _paramControllers['kdjKPeriod']?.text        = _params.kdjKPeriod.toString();
+    _paramControllers['kdjDPeriod']?.text         = _params.kdjDPeriod.toString();
+    _paramControllers['kdjOverbought']?.text    = _params.kdjOverbought.toString();
+    _paramControllers['kdjOversold']?.text      = _params.kdjOversold.toString();
+    _paramControllers['rsiPeriod']?.text         = _params.rsiPeriod.toString();
+    _paramControllers['rsiOverbought']?.text     = _params.rsiOverbought.toString();
+    _paramControllers['rsiOversold']?.text       = _params.rsiOversold.toString();
+    _paramControllers['bollPeriod']?.text        = _params.bollPeriod.toString();
+    _paramControllers['bollStdDev']?.text         = _params.bollStdDev.toString();
+    _paramControllers['maShortPeriod']?.text      = _params.maShortPeriod.toString();
+    _paramControllers['maMidPeriod']?.text        = _params.maMidPeriod.toString();
+    _paramControllers['maLongPeriod']?.text       = _params.maLongPeriod.toString();
+    _paramControllers['wrPeriod']?.text           = _params.wrPeriod.toString();
+    _paramControllers['wrOverbought']?.text       = _params.wrOverbought.toString();
+    _paramControllers['wrOversold']?.text         = _params.wrOversold.toString();
+    _paramControllers['dmiPeriod']?.text           = _params.dmiPeriod.toString();
+    _paramControllers['dmiAdxPeriod']?.text       = _params.dmiAdxPeriod.toString();
+    _paramControllers['dmiTrendThreshold']?.text  = _params.dmiTrendThreshold.toString();
+    _paramControllers['cciPeriod']?.text           = _params.cciPeriod.toString();
+    _paramControllers['stochRsiPeriod']?.text    = _params.stochRsiPeriod.toString();
+    _paramControllers['stochRsiKPeriod']?.text   = _params.stochRsiKPeriod.toString();
+    _paramControllers['stochRsiDPeriod']?.text   = _params.stochRsiDPeriod.toString();
+    _paramControllers['volumeMAperiod']?.text    = _params.volumeMAperiod.toString();
+  }
+
+  void _saveBacktestParams() {
+    try {
+      final bloc = context.read<StockBloc>();
+      bloc.stockStorage.saveBacktestParams({
+        'strategy': _selectedStrategy.name,
+        'initialCapital': double.tryParse(_initialCapitalController.text) ?? 100000,
+        'feeRate': double.tryParse(_feeRateController.text) ?? 0.001,
+        'positionRatio': double.tryParse(_positionRatioController.text) ?? 1.0,
+        'startDate': _startDate.toIso8601String(),
+        'endDate': _endDate.toIso8601String(),
+        'params': _params.toJson(),
+      });
+    } catch (_) {}
+  }
+
+  // ─── U-2: 导出CSV ───
+  Future<void> _exportCsv(BacktestResult r) async {
+    try {
+      final sb = StringBuffer();
+      sb.writeln('入场日期,入场价格,出场日期,出场价格,方向,持仓天数,盈亏,盈亏%,费率,出场原因');
+      for (final t in r.trades) {
+        sb.writeln([
+          t.entryDate,
+          t.entryPrice.toStringAsFixed(3),
+          t.exitDate,
+          t.exitPrice.toStringAsFixed(3),
+          t.isLong ? '多' : '空',
+          t.holdingDays,
+          t.profit.toStringAsFixed(2),
+          t.profitPercent.toStringAsFixed(2),
+          t.fee.toStringAsFixed(2),
+          t.exitReason ?? '',
+        ].join(','));
+      }
+      // 用 share_plus 分享文本
+      await Share.share(
+        sb.toString(),
+        subject: '回测结果_${_selectedStrategy.name}_${_dateFormat.format(_startDate)}_${_dateFormat.format(_endDate)}.csv',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CSV已生成，点击分享给其他应用')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('导出失败: $e')));
+      }
+    }
   }
 
   void _initParamControllers() {
@@ -264,36 +391,47 @@ class _BacktestPageState extends State<BacktestPage> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
+            // ─── 日期快捷按钮（U-10）───
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildDatePresetChip('近1月', 30),
+                  const SizedBox(width: 4),
+                  _buildDatePresetChip('近3月', 90),
+                  const SizedBox(width: 4),
+                  _buildDatePresetChip('近6月', 180),
+                  const SizedBox(width: 4),
+                  _buildDatePresetChip('近1年', 365),
+                  const SizedBox(width: 4),
+                  _buildDatePresetChip('近3年', 365 * 3),
+                  const SizedBox(width: 8),
+                  // 手动选择
+                  OutlinedButton.icon(
                     icon: const Icon(Icons.calendar_today, size: 16),
                     label: Text(_dateFormat.format(_startDate)),
                     onPressed: () => _selectDate(true),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('至', style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                Expanded(
-                  child: OutlinedButton.icon(
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Text('至', style: TextStyle(color: AppColors.textSecondary)),
+                  ),
+                  OutlinedButton.icon(
                     icon: const Icon(Icons.calendar_today, size: 16),
                     label: Text(_dateFormat.format(_endDate)),
                     onPressed: () => _selectDate(false),
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (_isLoadingData)
-                  const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                else
-                  IconButton(
-                    icon: const Icon(Icons.refresh, size: 20),
-                    onPressed: () => _ensureDataForRange(state),
-                    tooltip: '补全该时间段数据',
-                  ),
-              ],
+                  const SizedBox(width: 8),
+                  if (_isLoadingData)
+                    const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: () => _ensureDataForRange(state),
+                      tooltip: '补全该时间段数据',
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -341,6 +479,7 @@ class _BacktestPageState extends State<BacktestPage> {
                   _params = const StrategyParams();
                   _showAdvancedParams = false;
                 });
+                _syncControllersFromParams();
               },
             ),
             const SizedBox(height: 6),
@@ -676,12 +815,7 @@ class _BacktestPageState extends State<BacktestPage> {
 
 
 
-  void _updateParam(String key, int value, void Function(int) original) {
-    original(value);
-    _paramControllers[key]?.text = value.toString();
-  }
-
-
+  // （已整合到 _syncControllersFromParams）
 
   Widget _buildActionRow(StockLoaded state) {
     return Row(
@@ -734,9 +868,8 @@ class _BacktestPageState extends State<BacktestPage> {
       );
     }
 
-    // 排序：按总收益降序
-    final sorted = List<_ParamComboResult>.from(_batchResults)
-      ..sort((a, b) => b.result.totalProfit.compareTo(a.result.totalProfit));
+    // ─── U-6: 动态排序 ───
+    final sorted = _getSortedBatchResults();
 
     return Card(
       child: Padding(
@@ -755,18 +888,18 @@ class _BacktestPageState extends State<BacktestPage> {
               ],
             ),
             const Divider(),
-            // 表头
+            // 表头（U-6: 可点击排序）
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
-                children: const [
-                  SizedBox(width: 32, child: Text('#', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                  Expanded(flex: 3, child: Text('参数', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                  Expanded(child: Text('收益率', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                  Expanded(child: Text('胜率', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                  Expanded(child: Text('夏普', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                  Expanded(child: Text('最大回撤', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                  Expanded(child: Text('交易数', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                children: [
+                  const SizedBox(width: 32, child: Text('#', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  Expanded(flex: 3, child: const Text('参数', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                  _buildSortHeader('收益率', '收益率', width: 60),
+                  _buildSortHeader('胜率', '胜率', width: 50),
+                  _buildSortHeader('夏普', '夏普', width: 50),
+                  _buildSortHeader('最大回撤', '最大回撤', width: 60),
+                  _buildSortHeader('交易数', '交易数', width: 50),
                 ],
               ),
             ),
@@ -873,6 +1006,7 @@ class _BacktestPageState extends State<BacktestPage> {
   Widget _buildResultCard() {
     final r = _result!;
     final isProfit = r.totalProfit >= 0;
+    final isHighDrawdown = r.maxDrawdownPercent > 20;
 
     return Card(
       child: Padding(
@@ -880,6 +1014,40 @@ class _BacktestPageState extends State<BacktestPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ─── U-9: 回撤警告横幅 ───
+            if (isHighDrawdown)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withAlpha(26),
+                  border: Border.all(color: AppColors.error.withAlpha(77)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: AppColors.error, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '⚠️ 最大回撤 ${r.maxDrawdownPercent.toStringAsFixed(1)}% 超过20%，策略风险较高',
+                        style: const TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // ─── U-2: 导出CSV按钮 ───
+            Row(
+              children: [
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.download, size: 16),
+                  label: const Text('导出CSV'),
+                  onPressed: () => _exportCsv(r),
+                ),
+              ],
+            ),
             // 汇总
             Container(
               padding: const EdgeInsets.all(12),
@@ -911,12 +1079,23 @@ class _BacktestPageState extends State<BacktestPage> {
             _buildRow('亏损次数', '${r.losingTrades}'),
             _buildRow('初始资金', r.initialCapital.toStringAsFixed(2)),
             _buildRow('最终资金', r.finalCapital.toStringAsFixed(2)),
-            // 交易记录
+            // 交易记录（U-7 筛选器）
             if (r.trades.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('交易记录', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  const Text('交易记录', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  // ─── U-7: 筛选Chip ───
+                  _buildFilterChip('全部'),
+                  const SizedBox(width: 4),
+                  _buildFilterChip('盈利'),
+                  const SizedBox(width: 4),
+                  _buildFilterChip('亏损'),
+                ],
+              ),
               const Divider(),
-              ...r.trades.take(10).map((t) => ListTile(
+              ..._getFilteredTrades(r.trades).take(10).map((t) => ListTile(
                     dense: true,
                     leading: Icon(t.profit >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
                         color: t.profit >= 0 ? AppColors.success : AppColors.error),
@@ -925,10 +1104,10 @@ class _BacktestPageState extends State<BacktestPage> {
                     trailing: Text('${t.profit >= 0 ? "+" : ""}${t.profit.toStringAsFixed(2)}',
                         style: TextStyle(color: t.profit >= 0 ? AppColors.success : AppColors.error)),
                   )),
-              if (r.trades.length > 10)
+              if (_getFilteredTrades(r.trades).length > 10)
                 Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Text('还有 ${r.trades.length - 10} 条记录...',
+                  child: Text('还有 ${_getFilteredTrades(r.trades).length - 10} 条记录...',
                       style: const TextStyle(color: AppColors.textSecondary)),
                 ),
             ],
@@ -936,6 +1115,112 @@ class _BacktestPageState extends State<BacktestPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildDatePresetChip(String label, int days) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      onPressed: () {
+        final now = DateTime.now();
+        setState(() {
+          _endDate = now;
+          _startDate = now.subtract(Duration(days: days));
+          _result = null;
+          _batchResults = [];
+        });
+      },
+    );
+  }
+
+  // ─── U-6: 批量比较排序 ───
+  Widget _buildSortHeader(String label, String column, {required double width}) {
+    final isActive = _sortColumn == column;
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            if (_sortColumn == column) {
+              _sortAsc = !_sortAsc;
+            } else {
+              _sortColumn = column;
+              _sortAsc = false;
+            }
+          });
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isActive ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: isActive ? FontWeight.bold : null,
+              ),
+            ),
+            if (isActive)
+              Icon(
+                _sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 10,
+                color: AppColors.primary,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_ParamComboResult> _getSortedBatchResults() {
+    final list = List<_ParamComboResult>.from(_batchResults);
+    list.sort((a, b) {
+      int cmp;
+      switch (_sortColumn) {
+        case '胜率':
+          cmp = a.result.winRate.compareTo(b.result.winRate);
+          break;
+        case '夏普':
+          cmp = a.result.sharpeRatio.compareTo(b.result.sharpeRatio);
+          break;
+        case '最大回撤':
+          cmp = a.result.maxDrawdownPercent.compareTo(b.result.maxDrawdownPercent);
+          break;
+        case '交易数':
+          cmp = a.result.totalTrades.compareTo(b.result.totalTrades);
+          break;
+        default:
+          cmp = (a.result.totalProfit / a.result.initialCapital)
+              .compareTo(b.result.totalProfit / b.result.initialCapital);
+      }
+      return _sortAsc ? cmp : -cmp;
+    });
+    return list;
+  }
+
+  // ─── U-7: 筛选Chip ───
+  Widget _buildFilterChip(String label) {
+    final isSelected = _tradeFilter == label;
+    return FilterChip(
+      label: Text(label, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : null)),
+      selected: isSelected,
+      selectedColor: AppColors.primary,
+      checkmarkColor: Colors.white,
+      visualDensity: VisualDensity.compact,
+      onSelected: (_) => setState(() => _tradeFilter = label),
+    );
+  }
+
+  List<Trade> _getFilteredTrades(List<Trade> trades) {
+    switch (_tradeFilter) {
+      case '盈利':
+        return trades.where((t) => t.profit >= 0).toList();
+      case '亏损':
+        return trades.where((t) => t.profit < 0).toList();
+      default:
+        return trades;
+    }
   }
 
   Widget _buildMetric(String label, String value, Color color) {
@@ -995,6 +1280,7 @@ class _BacktestPageState extends State<BacktestPage> {
           _result = result;
           _isRunning = false;
         });
+        _saveBacktestParams(); // U-1: 保存参数
       }
     } catch (e, st) {
       debugPrint('Backtest error: $e\n$st');
@@ -1035,6 +1321,7 @@ class _BacktestPageState extends State<BacktestPage> {
         _batchResults = List.generate(_presetCombos.length, (i) => _ParamComboResult(_presetCombos[i], results[i]));
         _isRunning = false;
       });
+      _saveBacktestParams(); // U-1: 保存参数
     }
   }
 

@@ -401,6 +401,8 @@ class BacktestResult extends Equatable {
   final List<Trade> trades;
   final double initialCapital;
   final double finalCapital;
+  // ─── U-4: 资金曲线 ───
+  final List<double> capitalHistory; // 每日资金
 
   const BacktestResult({
     required this.totalTrades,
@@ -419,10 +421,11 @@ class BacktestResult extends Equatable {
     required this.trades,
     required this.initialCapital,
     required this.finalCapital,
+    this.capitalHistory = const [],
   });
 
   @override
-  List<Object?> get props => [totalTrades, winningTrades, losingTrades, winRate, totalProfit, maxDrawdown, maxDrawdownPercent, sharpeRatio, kellyPercent, kellyFraction, avgWin, avgLoss, profitFactor, trades, initialCapital, finalCapital];
+  List<Object?> get props => [totalTrades, winningTrades, losingTrades, winRate, totalProfit, maxDrawdown, maxDrawdownPercent, sharpeRatio, kellyPercent, kellyFraction, avgWin, avgLoss, profitFactor, trades, initialCapital, finalCapital, capitalHistory];
 }
 
 class RiskReport extends Equatable {
