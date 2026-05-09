@@ -219,25 +219,37 @@ class _BacktestPageState extends State<BacktestPage> {
     };
   }
 
-  void _runBacktest(StockLoaded state) {
+  void _runBacktest(StockLoaded state) async {
     setState(() => _isRunning = true);
 
     final initialCapital = double.tryParse(_initialCapitalController.text) ?? 100000;
     final feeRate = double.tryParse(_feeRateController.text) ?? 0.001;
     final positionRatio = double.tryParse(_positionRatioController.text) ?? 1.0;
 
-    final result = BacktestCalculator.runBacktest(
-      state.stockData.quotes,
-      _selectedStrategy,
-      initialCapital: initialCapital,
-      feeRate: feeRate,
-      positionRatio: positionRatio,
-    );
+    try {
+      final result = await Future(() => BacktestCalculator.runBacktest(
+        state.stockData.quotes,
+        _selectedStrategy,
+        initialCapital: initialCapital,
+        feeRate: feeRate,
+        positionRatio: positionRatio,
+      ));
 
-    setState(() {
-      _result = result;
-      _isRunning = false;
-    });
+      if (mounted) {
+        setState(() {
+          _result = result;
+          _isRunning = false;
+        });
+      }
+    } catch (e, st) {
+      debugPrint('Backtest error: $e\n$st');
+      if (mounted) {
+        setState(() => _isRunning = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('回测出错: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildResultCard() {
