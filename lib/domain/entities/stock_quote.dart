@@ -570,3 +570,58 @@ class MoneyFlowData extends Equatable {
   @override
   List<Object?> get props => [symbol, name, flows];
 }
+
+// ============ 出场模板 ============
+
+/// 出场模板：用户保存/加载常用止损止盈配置
+class ExitTemplate {
+  final String name;               // 模板名称，如"保守型"
+  final double? stopLossPercent;   // 止损%，如 5.0 = 亏损5%时止损
+  final double? takeProfitPercent; // 止盈%，如 10.0 = 盈利10%时止盈
+  final bool enableTimeExit;       // 是否启用时间止损
+  final int maxHoldingDays;        // 最大持仓天数
+  final double? slippagePercent;  // 滑点‰，如 0.1 = 千分之一
+
+  const ExitTemplate({
+    required this.name,
+    this.stopLossPercent,
+    this.takeProfitPercent,
+    this.enableTimeExit = false,
+    this.maxHoldingDays = 20,
+    this.slippagePercent,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'stopLossPercent': stopLossPercent,
+    'takeProfitPercent': takeProfitPercent,
+    'enableTimeExit': enableTimeExit,
+    'maxHoldingDays': maxHoldingDays,
+    'slippagePercent': slippagePercent,
+  };
+
+  factory ExitTemplate.fromJson(Map<String, dynamic> json) => ExitTemplate(
+    name: json['name'] as String,
+    stopLossPercent: (json['stopLossPercent'] as num?)?.toDouble(),
+    takeProfitPercent: (json['takeProfitPercent'] as num?)?.toDouble(),
+    enableTimeExit: json['enableTimeExit'] as bool? ?? false,
+    maxHoldingDays: json['maxHoldingDays'] as int? ?? 20,
+    slippagePercent: (json['slippagePercent'] as num?)?.toDouble(),
+  );
+
+  ExitTemplate copyWith({
+    String? name,
+    double? stopLossPercent,
+    double? takeProfitPercent,
+    bool? enableTimeExit,
+    int? maxHoldingDays,
+    double? slippagePercent,
+  }) => ExitTemplate(
+    name: name ?? this.name,
+    stopLossPercent: stopLossPercent ?? this.stopLossPercent,
+    takeProfitPercent: takeProfitPercent ?? this.takeProfitPercent,
+    enableTimeExit: enableTimeExit ?? this.enableTimeExit,
+    maxHoldingDays: maxHoldingDays ?? this.maxHoldingDays,
+    slippagePercent: slippagePercent ?? this.slippagePercent,
+  );
+}

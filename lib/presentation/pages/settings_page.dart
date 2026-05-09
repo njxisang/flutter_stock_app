@@ -2,10 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
+import '../../domain/entities/stock_quote.dart';
 import '../blocs/settings/settings_cubit.dart';
+import '../blocs/stock/stock_bloc.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  List<ExitTemplate> _exitTemplates = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExitTemplates();
+  }
+
+  void _loadExitTemplates() {
+    final templates = context.read<StockBloc>().stockStorage.getExitTemplates();
+    setState(() => _exitTemplates = templates);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,10 +146,226 @@ class SettingsPage extends StatelessWidget {
                 trailing: const Icon(Icons.delete_outline, size: 20),
                 onTap: () => _showClearHistoryConfirmation(context),
               ),
+
+              // ── S-4: 出场模板 ─────────────────────────────────────
+              const Divider(height: 32),
+              const _SectionHeader(title: '出场模板'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('新增模板'),
+                  onPressed: () => _showAddTemplateSheet(context),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_exitTemplates.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('暂无模板，点击上方新增', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                )
+              else
+                ..._exitTemplates.expand((t) => [
+                  _buildTemplateCard(context, t),
+                  const Divider(height: 1),
+                ]),
+
               const SizedBox(height: 32),
             ],
           );
         },
+      ),
+    );
+  }
+
+  // ─── S-4: 出场模板卡片 ───
+  Widget _buildTemplateCard(BuildContext context, ExitTemplate t) {
+    return Dismissible(
+      key: Key(t.name),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmDeleteTemplate(context, t.name),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.error,
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      child: ListTile(
+        title: Text(t.name),
+        subtitle: Text(
+          '止损${t.stopLossPercent != null ? '${t.stopLossPercent}%' : '未设'}  '
+          '止盈${t.takeProfitPercent != null ? '${t.takeProfitPercent}%' : '未设'}  '
+          '时间止损${t.enableTimeExit ? '${t.maxHoldingDays}天' : '关'}',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: TextButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('模板"${t.name}"已应用，请前往回测页面'),
+                action: SnackBarAction(label: '去回测', onPressed: () => context.go('/backtest')),
+              ),
+            );
+          },
+          child: const Text('应用'),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDeleteTemplate(BuildContext context, String name) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除模板'),
+        content: Text('确定删除模板"$name"吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await context.read<StockBloc>().stockStorage.deleteExitTemplate(name);
+      _loadExitTemplates();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('模板"$name"已删除')));
+      }
+    }
+    return false; // prevent default dismiss behavior
+  }
+
+  // ─── S-4: 新增模板 BottomSheet ───
+  void _showAddTemplateSheet(BuildContext context) {
+    final nameController = TextEditingController();
+    final stopLossController = TextEditingController();
+    final takeProfitController = TextEditingController();
+    final maxDaysController = TextEditingController(text: '20');
+    final slippageController = TextEditingController();
+    bool enableTimeExit = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('新增出场模板', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: '模板名称', hintText: '如：保守型',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: stopLossController,
+                        decoration: const InputDecoration(
+                          labelText: '止损%', hintText: '如：5',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: takeProfitController,
+                        decoration: const InputDecoration(
+                          labelText: '止盈%', hintText: '如：10',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('时间止损'),
+                    Switch(
+                      value: enableTimeExit,
+                      onChanged: (v) => setSheetState(() => enableTimeExit = v),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: maxDaysController,
+                        decoration: const InputDecoration(
+                          labelText: '最大持仓(天)',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: slippageController,
+                        decoration: const InputDecoration(
+                          labelText: '滑点‰',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          final template = ExitTemplate(
+                            name: name,
+                            stopLossPercent: double.tryParse(stopLossController.text),
+                            takeProfitPercent: double.tryParse(takeProfitController.text),
+                            enableTimeExit: enableTimeExit,
+                            maxHoldingDays: int.tryParse(maxDaysController.text) ?? 20,
+                            slippagePercent: double.tryParse(slippageController.text),
+                          );
+                          await context.read<StockBloc>().stockStorage.saveExitTemplate(template);
+                          _loadExitTemplates();
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('模板"$name"已保存')),
+                            );
+                          }
+                        },
+                        child: const Text('保存'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

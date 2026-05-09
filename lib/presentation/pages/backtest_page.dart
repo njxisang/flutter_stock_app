@@ -55,6 +55,23 @@ class _BacktestPageState extends State<BacktestPage> {
   // ─── 预置参数组合（多参数比较用）───
   List<StrategyParams> _presetCombos = [];
 
+  // ─── S-4: 止损止盈参数 ───
+  double? _stopLossPercent;
+  double? _takeProfitPercent;
+  bool _enableTimeExit = false;
+  int _maxHoldingDays = 20;
+  double? _slippagePercent;
+
+  // ─── S-4: 出场模板 ───
+  List<ExitTemplate> _exitTemplates = [];
+  String? _selectedTemplateName;
+
+  // ─── S-4: 出场参数 TextEditingController（B-4 Fix: 预创建避免重建）───
+  final _stopLossController = TextEditingController();
+  final _takeProfitController = TextEditingController();
+  final _maxHoldingDaysController = TextEditingController(text: '20');
+  final _slippageController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +80,8 @@ class _BacktestPageState extends State<BacktestPage> {
     _initParamControllers();
     // U-1: 从本地存储恢复上次参数
     _loadBacktestParams();
+    // S-4: 加载出场模板列表
+    _loadExitTemplates();
   }
 
   void _loadBacktestParams() {
@@ -97,6 +116,19 @@ class _BacktestPageState extends State<BacktestPage> {
           // 同步更新 controller 显示值
           _syncControllersFromParams();
         }
+        // S-4: 加载止损止盈参数
+        if (saved['stopLossPercent'] != null) {
+          _stopLossPercent = (saved['stopLossPercent'] as num).toDouble();
+        }
+        if (saved['takeProfitPercent'] != null) {
+          _takeProfitPercent = (saved['takeProfitPercent'] as num).toDouble();
+        }
+        _enableTimeExit = saved['enableTimeExit'] as bool? ?? false;
+        _maxHoldingDays = saved['maxHoldingDays'] as int? ?? 20;
+        if (saved['slippagePercent'] != null) {
+          _slippagePercent = (saved['slippagePercent'] as num).toDouble();
+        }
+        _syncExitControllersFromState();
       });
     } catch (_) {}
   }
@@ -142,6 +174,12 @@ class _BacktestPageState extends State<BacktestPage> {
         'startDate': _startDate.toIso8601String(),
         'endDate': _endDate.toIso8601String(),
         'params': _params.toJson(),
+        // S-4: 止损止盈参数
+        'stopLossPercent': _stopLossPercent,
+        'takeProfitPercent': _takeProfitPercent,
+        'enableTimeExit': _enableTimeExit,
+        'maxHoldingDays': _maxHoldingDays,
+        'slippagePercent': _slippagePercent,
       });
     } catch (_) {}
   }
@@ -425,6 +463,11 @@ class _BacktestPageState extends State<BacktestPage> {
     _initialCapitalController.dispose();
     _feeRateController.dispose();
     _positionRatioController.dispose();
+    // S-4: 释放出场参数控制器
+    _stopLossController.dispose();
+    _takeProfitController.dispose();
+    _maxHoldingDaysController.dispose();
+    _slippageController.dispose();
     // B-4 Fix: 释放所有策略参数 TextEditingController
     for (final controller in _paramControllers.values) {
       controller.dispose();
@@ -679,6 +722,8 @@ class _BacktestPageState extends State<BacktestPage> {
             if (_showAdvancedParams) ...[
               const Divider(height: 24),
               _buildStrategyParamsSection(),
+              const Divider(height: 24),
+              _buildExitParamsSection(),
             ],
           ],
         ),
@@ -730,6 +775,248 @@ class _BacktestPageState extends State<BacktestPage> {
         if (parsed != null && parsed > 0) onChanged(parsed);
       },
     );
+  }
+
+  // ─── S-4: 出场参数区域 ───
+  Widget _buildExitParamsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('出场参数', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            if (_exitTemplates.isNotEmpty)
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String?>(
+                  value: _selectedTemplateName,
+                  decoration: const InputDecoration(
+                    labelText: '模板',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('不使用模板')),
+                    ..._exitTemplates.map((t) => DropdownMenuItem(value: t.name, child: Text(t.name))),
+                  ],
+                  onChanged: (v) => _applyTemplate(v),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // 第一行：止损% + 止盈%
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: '止损%',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                controller: _stopLossController,
+                onChanged: (t) => setState(() {
+                  _stopLossPercent = double.tryParse(t);
+                  _selectedTemplateName = null;
+                }),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: '止盈%',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                controller: _takeProfitController,
+                onChanged: (t) => setState(() {
+                  _takeProfitPercent = double.tryParse(t);
+                  _selectedTemplateName = null;
+                }),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // 第二行：时间止损开关 + 最大持仓天数 + 滑点‰
+        Row(
+          children: [
+            const Text('时间止损'),
+            Switch(
+              value: _enableTimeExit,
+              onChanged: (v) => setState(() {
+                _enableTimeExit = v;
+                _selectedTemplateName = null;
+              }),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: '最大持仓(天)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                controller: _maxHoldingDaysController,
+                onChanged: (t) => setState(() {
+                  _maxHoldingDays = int.tryParse(t) ?? 20;
+                  _selectedTemplateName = null;
+                }),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: '滑点‰',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                controller: _slippageController,
+                onChanged: (t) => setState(() {
+                  _slippagePercent = double.tryParse(t);
+                  _selectedTemplateName = null;
+                }),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // 保存/删除模板按钮
+        Row(
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.save, size: 16),
+              label: const Text('保存模板'),
+              onPressed: () => _showSaveTemplateDialog(),
+            ),
+            if (_selectedTemplateName != null) ...[
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.delete, size: 16),
+                label: const Text('删除模板'),
+                onPressed: () => _deleteCurrentTemplate(),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _applyTemplate(String? v) {
+    setState(() {
+      _selectedTemplateName = v;
+      if (v != null) {
+        final t = _exitTemplates.firstWhere((e) => e.name == v);
+        _stopLossPercent = t.stopLossPercent;
+        _takeProfitPercent = t.takeProfitPercent;
+        _enableTimeExit = t.enableTimeExit;
+        _maxHoldingDays = t.maxHoldingDays;
+        _slippagePercent = t.slippagePercent;
+        _syncExitControllersFromState();
+      }
+    });
+  }
+
+  void _syncExitControllersFromState() {
+    _stopLossController.text = _stopLossPercent?.toString() ?? '';
+    _takeProfitController.text = _takeProfitPercent?.toString() ?? '';
+    _maxHoldingDaysController.text = _maxHoldingDays.toString();
+    _slippageController.text = _slippagePercent?.toString() ?? '';
+  }
+
+  void _showSaveTemplateDialog() {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('保存出场模板'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '模板名称',
+            hintText: '如：保守型',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) return;
+              final template = ExitTemplate(
+                name: name,
+                stopLossPercent: _stopLossPercent,
+                takeProfitPercent: _takeProfitPercent,
+                enableTimeExit: _enableTimeExit,
+                maxHoldingDays: _maxHoldingDays,
+                slippagePercent: _slippagePercent,
+              );
+              await context.read<StockBloc>().stockStorage.saveExitTemplate(template);
+              final templates = context.read<StockBloc>().stockStorage.getExitTemplates();
+              if (mounted) {
+                setState(() {
+                  _exitTemplates = templates;
+                  _selectedTemplateName = name;
+                });
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('模板"$name"已保存')));
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteCurrentTemplate() async {
+    final name = _selectedTemplateName;
+    if (name == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除模板'),
+        content: Text('确定删除模板"$name"吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      await context.read<StockBloc>().stockStorage.deleteExitTemplate(name);
+      final templates = context.read<StockBloc>().stockStorage.getExitTemplates();
+      setState(() {
+        _exitTemplates = templates;
+        _selectedTemplateName = null;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('模板"$name"已删除')));
+      }
+    }
+  }
+
+  // ─── S-4 加载模板列表（在initState和设置页返回时调用）───
+  void _loadExitTemplates() {
+    try {
+      final templates = context.read<StockBloc>().stockStorage.getExitTemplates();
+      setState(() => _exitTemplates = templates);
+    } catch (_) {}
   }
 
   Widget _buildStrategyParamsSection() {
@@ -1514,6 +1801,12 @@ class _BacktestPageState extends State<BacktestPage> {
         feeRate: feeRate,
         positionRatio: positionRatio,
         params: _params,
+        // S-4: 止损止盈参数
+        stopLossPercent: _stopLossPercent,
+        takeProfitPercent: _takeProfitPercent,
+        enableTimeExit: _enableTimeExit,
+        maxHoldingDays: _maxHoldingDays,
+        slippagePercent: _slippagePercent ?? 0.0,
       ));
       if (mounted) {
         setState(() {
@@ -1553,6 +1846,12 @@ class _BacktestPageState extends State<BacktestPage> {
         feeRate: feeRate,
         positionRatio: positionRatio,
         params: params,
+        // S-4: 止损止盈参数（批量回测共用）
+        stopLossPercent: _stopLossPercent,
+        takeProfitPercent: _takeProfitPercent,
+        enableTimeExit: _enableTimeExit,
+        maxHoldingDays: _maxHoldingDays,
+        slippagePercent: _slippagePercent ?? 0.0,
       ))),
     );
 

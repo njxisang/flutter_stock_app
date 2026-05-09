@@ -123,4 +123,31 @@ class StockLocalStorage {
       await _prefs.remove(key);
     }
   }
+
+  // ─── 出场模板（ExitTemplate）───
+  static const String _exitTemplatesKey = 'exit_templates';
+
+  List<ExitTemplate> getExitTemplates() {
+    final json = _prefs.getString(_exitTemplatesKey);
+    if (json == null) return [];
+    final list = jsonDecode(json) as List<dynamic>;
+    return list.map((e) => ExitTemplate.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> saveExitTemplate(ExitTemplate t) async {
+    final templates = getExitTemplates();
+    final idx = templates.indexWhere((e) => e.name == t.name);
+    if (idx >= 0) {
+      templates[idx] = t;
+    } else {
+      templates.add(t);
+    }
+    await _prefs.setString(_exitTemplatesKey, jsonEncode(templates.map((e) => e.toJson()).toList()));
+  }
+
+  Future<void> deleteExitTemplate(String name) async {
+    final templates = getExitTemplates();
+    templates.removeWhere((e) => e.name == name);
+    await _prefs.setString(_exitTemplatesKey, jsonEncode(templates.map((e) => e.toJson()).toList()));
+  }
 }
